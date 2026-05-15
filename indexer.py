@@ -90,6 +90,10 @@ def index_plex_library(embedder):
         logger.error(f"Plex connection error: {e}")
         return 0
 
+    # Get full Plex URL for poster images
+    plex_url = os.getenv("PLEX_URL", "http://localhost:32400")
+    plex_token = os.getenv("PLEX_TOKEN")
+
     # Clear existing database
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -111,6 +115,11 @@ def index_plex_library(embedder):
                 for chunk_idx, chunk in enumerate(chunks):
                     embedding = embedder.encode(chunk).tolist()
 
+                    # Build full poster URL
+                    poster_url = ""
+                    if movie.thumb:
+                        poster_url = f"{plex_url}{movie.thumb}?X-Plex-Token={plex_token}"
+
                     conn = sqlite3.connect(DB_PATH)
                     c = conn.cursor()
                     c.execute('''
@@ -122,7 +131,7 @@ def index_plex_library(embedder):
                         "movie",
                         movie.summary or "",
                         str(movie.key),
-                        movie.thumb or "",
+                        poster_url,
                         json.dumps(embedding)
                     ))
                     conn.commit()
@@ -148,6 +157,11 @@ def index_plex_library(embedder):
                 for chunk_idx, chunk in enumerate(chunks):
                     embedding = embedder.encode(chunk).tolist()
 
+                    # Build full poster URL
+                    poster_url = ""
+                    if show.thumb:
+                        poster_url = f"{plex_url}{show.thumb}?X-Plex-Token={plex_token}"
+
                     conn = sqlite3.connect(DB_PATH)
                     c = conn.cursor()
                     c.execute('''
@@ -159,7 +173,7 @@ def index_plex_library(embedder):
                         "tv_show",
                         show.summary or "",
                         str(show.key),
-                        show.thumb or "",
+                        poster_url,
                         json.dumps(embedding)
                     ))
                     conn.commit()

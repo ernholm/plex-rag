@@ -259,6 +259,7 @@
                     autocomplete="off"
                 >
                 <button onclick="performSearch()">Search</button>
+                <button onclick="rebuildIndex()" style="background: #764ba2;">⟳ Rebuild</button>
             </div>
             <div class="status" id="status">Ready to search</div>
             <div class="error" id="error"></div>
@@ -375,6 +376,29 @@
             return div.innerHTML;
         }
 
+        // Rebuild index
+        async function rebuildIndex() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⟳ Rebuilding...';
+            statusDiv.innerHTML = '<div class="loading"><span>●</span><span>●</span><span>●</span></div>';
+            errorDiv.classList.remove('active');
+
+            try {
+                const response = await fetch('/rebuild-index', { method: 'POST' });
+                const data = await response.json();
+                statusDiv.textContent = `✓ Index rebuilt: ${data.items_indexed} items indexed`;
+                btn.textContent = '⟳ Rebuild';
+                btn.disabled = false;
+            } catch (error) {
+                errorDiv.textContent = `Rebuild error: ${error.message}`;
+                errorDiv.classList.add('active');
+                statusDiv.textContent = 'Rebuild failed';
+                btn.textContent = '⟳ Rebuild';
+                btn.disabled = false;
+            }
+        }
+
         // Check API status on load
         async function checkStatus() {
             try {
@@ -383,7 +407,7 @@
                 if (data.total_items > 0) {
                     statusDiv.textContent = `Index ready: ${data.total_items} items indexed`;
                 } else {
-                    statusDiv.textContent = '⚠️ Index is empty. Run the indexer to populate.';
+                    statusDiv.textContent = '⚠️ Index is empty. Click "Rebuild" to populate.';
                 }
             } catch (error) {
                 statusDiv.textContent = 'Unable to connect to API';
