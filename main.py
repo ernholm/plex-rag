@@ -6,8 +6,11 @@ from sentence_transformers import SentenceTransformer
 import sqlite3
 import json
 import os
+import logging
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(title="Plex RAG Search")
