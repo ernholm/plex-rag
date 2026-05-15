@@ -116,6 +116,18 @@ async def search(query_data: SearchQuery):
                 # Calculate similarity
                 similarity = cosine_similarity(query_embedding, embedding)
 
+                # Boost score if query terms appear in title (case-insensitive)
+                query_lower = query_data.query.lower()
+                title_lower = title.lower()
+                if len(query_lower) > 2:  # Only for meaningful queries
+                    # Check if significant portions of query appear in title
+                    query_words = query_lower.split()
+                    matched_words = sum(1 for word in query_words if len(word) > 2 and word in title_lower)
+                    if matched_words > 0:
+                        # Boost based on match ratio
+                        match_ratio = matched_words / len([w for w in query_words if len(w) > 2])
+                        similarity = min(0.99, similarity + (0.3 * match_ratio))  # Add up to 30% boost
+
                 results.append({
                     'id': doc_id,
                     'title': title,
