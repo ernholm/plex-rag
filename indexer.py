@@ -63,8 +63,10 @@ def init_db():
     """Initialize SQLite database"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # Drop old table if it exists to ensure schema is up to date
+    c.execute('DROP TABLE IF EXISTS embeddings')
     c.execute('''
-        CREATE TABLE IF NOT EXISTS embeddings (
+        CREATE TABLE embeddings (
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             type TEXT NOT NULL,
