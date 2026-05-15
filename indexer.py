@@ -79,6 +79,7 @@ def init_db():
             duration INTEGER,
             director TEXT,
             genres TEXT,
+            resolution TEXT,
             embedding BLOB NOT NULL
         )
     ''')
@@ -136,11 +137,32 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
             except:
                 pass
 
+            # Get resolution
+            resolution = ""
+            try:
+                if hasattr(item, 'media') and item.media and len(item.media) > 0:
+                    video_res = getattr(item.media[0], 'videoResolution', None)
+                    if video_res:
+                        # Normalize resolution format
+                        res_lower = str(video_res).lower()
+                        if '4k' in res_lower or '2160' in res_lower:
+                            resolution = "4K"
+                        elif '1080' in res_lower:
+                            resolution = "1080p"
+                        elif '720' in res_lower:
+                            resolution = "720p"
+                        elif '480' in res_lower or '540' in res_lower:
+                            resolution = "SD"
+                        else:
+                            resolution = video_res
+            except:
+                pass
+
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute('''
-                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 f"{item_type}_{item.key}_{chunk_idx}",
                 item.title,
@@ -154,6 +176,7 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
                 duration,
                 director,
                 json.dumps(genres),
+                resolution,
                 json.dumps(embedding)
             ))
             conn.commit()

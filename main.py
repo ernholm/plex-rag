@@ -55,6 +55,50 @@ def cosine_similarity(vec1, vec2):
         return 0
     return dot_product / (mag1 * mag2)
 
+def get_all_metadata(conn):
+    """Get all unique actors and genres from database"""
+    c = conn.cursor()
+
+    # Get all actors
+    c.execute('SELECT DISTINCT actors FROM embeddings WHERE actors IS NOT NULL')
+    all_actors = set()
+    for row in c.fetchall():
+        try:
+            actors = json.loads(row[0])
+            all_actors.update(actors)
+        except:
+            pass
+
+    # Get all genres
+    c.execute('SELECT DISTINCT genres FROM embeddings WHERE genres IS NOT NULL')
+    all_genres = set()
+    for row in c.fetchall():
+        try:
+            genres = json.loads(row[0])
+            all_genres.update(genres)
+        except:
+            pass
+
+    return all_actors, all_genres
+
+def extract_metadata_filters(query, all_actors, all_genres):
+    """Extract actor names and genres from query"""
+    query_lower = query.lower()
+    matched_actors = []
+    matched_genres = []
+
+    # Check for actor names (case-insensitive)
+    for actor in all_actors:
+        if actor.lower() in query_lower:
+            matched_actors.append(actor)
+
+    # Check for genre names (case-insensitive)
+    for genre in all_genres:
+        if genre.lower() in query_lower:
+            matched_genres.append(genre)
+
+    return matched_actors, matched_genres
+
 init_db()
 
 # Models
@@ -75,6 +119,7 @@ class SearchResult(BaseModel):
     duration: Optional[int] = None
     director: Optional[str] = None
     genres: List[str] = []
+    resolution: Optional[str] = None
 
 class IndexStatusResponse(BaseModel):
     total_items: int
@@ -94,8 +139,13 @@ async def search(query_data: SearchQuery):
 
         # Get all embeddings from database
         conn = sqlite3.connect(DB_PATH)
+
+        # Extract metadata filters from query
+        all_actors, all_genres = get_all_metadata(conn)
+        matched_actors, matched_genres = extract_metadata_filters(query_data.query, all_actors, all_genres)
+
         c = conn.cursor()
-        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, embedding FROM embeddings')
+        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, embedding FROM embeddings')
         rows = c.fetchall()
         conn.close()
 
@@ -106,7 +156,7 @@ async def search(query_data: SearchQuery):
         results = []
         for row in rows:
             try:
-                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, embedding_blob = row
+                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, resolution, embedding_blob = row
 
                 # Deserialize embedding, actors, and genres
                 embedding = json.loads(embedding_blob)
@@ -128,6 +178,23 @@ async def search(query_data: SearchQuery):
                         match_ratio = matched_words / len([w for w in query_words if len(w) > 2])
                         similarity = min(0.99, similarity + (0.3 * match_ratio))  # Add up to 30% boost
 
+                # Boost score for metadata matches
+                metadata_boost = 0
+
+                # Boost if result has matching actor
+                if matched_actors and actors:
+                    for actor in actors:
+                        if any(actor.lower() == ma.lower() for ma in matched_actors):
+                            metadata_boost += 0.15
+
+                # Boost if result has matching genre
+                if matched_genres and genres:
+                    matching_genres = [g for g in genres if any(g.lower() == mg.lower() for mg in matched_genres)]
+                    if matching_genres:
+                        metadata_boost += min(0.20, 0.10 * len(matching_genres))
+
+                similarity = min(0.99, similarity + metadata_boost)
+
                 results.append({
                     'id': doc_id,
                     'title': title,
@@ -141,15 +208,32 @@ async def search(query_data: SearchQuery):
                     'duration': duration,
                     'director': director,
                     'genres': genres,
+                    'resolution': resolution,
                     'similarity': similarity
                 })
             except Exception as e:
                 print(f"Error processing row: {e}")
                 continue
 
+        # Deduplicate by plex_key, keeping the highest similarity score
+        seen_keys = {}
+        deduped_results = []
+        for result in results:
+            key = result['plex_key']
+            if key not in seen_keys:
+                seen_keys[key] = result
+                deduped_results.append(result)
+            else:
+                # Keep the result with higher similarity
+                if result['similarity'] > seen_keys[key]['similarity']:
+                    # Replace in list
+                    idx = next(i for i, r in enumerate(deduped_results) if r['plex_key'] == key)
+                    deduped_results[idx] = result
+                    seen_keys[key] = result
+
         # Sort by similarity and take top N
-        results.sort(key=lambda x: x['similarity'], reverse=True)
-        top_results = results[:query_data.limit]
+        deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
+        top_results = deduped_results[:query_data.limit]
 
         return [
             SearchResult(
@@ -164,7 +248,8 @@ async def search(query_data: SearchQuery):
                 year=r['year'],
                 duration=r['duration'],
                 director=r['director'],
-                genres=r['genres']
+                genres=r['genres'],
+                resolution=r['resolution']
             )
             for r in top_results
         ]

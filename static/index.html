@@ -176,6 +176,18 @@
             padding: 4px 8px;
             border-radius: 4px;
             margin-bottom: 8px;
+            margin-right: 4px;
+        }
+
+        .result-resolution {
+            display: inline-block;
+            font-size: 0.8rem;
+            background: #fff3cd;
+            color: #856404;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-weight: 600;
         }
 
         .result-relevance {
@@ -383,6 +395,17 @@
             margin-top: 4px;
         }
 
+        .resolution-badge {
+            display: inline-block;
+            background: #fff3cd;
+            color: #856404;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
         .loading {
             display: flex;
             justify-content: center;
@@ -438,6 +461,12 @@
                     placeholder="e.g., 'movies with supernatural monsters' or 'comedies from the 80s'"
                     autocomplete="off"
                 >
+                <select id="limitSelect" style="padding: 12px 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;">
+                    <option value="12">12 Results</option>
+                    <option value="25">25 Results</option>
+                    <option value="50">50 Results</option>
+                    <option value="100">100 Results</option>
+                </select>
                 <button onclick="performSearch()">Search</button>
                 <button onclick="rebuildIndex()" style="background: #764ba2;">⟳ Rebuild</button>
             </div>
@@ -466,6 +495,7 @@
                 <div class="modal-meta">
                     <span class="modal-badge" id="modalType"></span>
                     <span class="modal-badge modal-relevance" id="modalRelevance"></span>
+                    <span id="modalResolution"></span>
                 </div>
                 <div class="modal-rating" id="modalRating"></div>
                 <div class="modal-details" id="modalDetails"></div>
@@ -497,6 +527,8 @@
                 return;
             }
 
+            const limit = parseInt(document.getElementById('limitSelect').value);
+
             statusDiv.innerHTML = '<div class="loading"><span>●</span><span>●</span><span>●</span></div>';
             errorDiv.classList.remove('active');
             resultsSection.classList.remove('active');
@@ -510,7 +542,7 @@
                     },
                     body: JSON.stringify({
                         query: query,
-                        limit: 12
+                        limit: limit
                     })
                 });
 
@@ -560,7 +592,10 @@
                 </div>
                 <div class="result-content">
                     <div class="result-title">${escapeHtml(result.title)}</div>
-                    <div class="result-type">${typeLabel}</div>
+                    <div>
+                        <span class="result-type">${typeLabel}</span>
+                        ${result.resolution ? `<span class="result-resolution">${escapeHtml(result.resolution)}</span>` : ''}
+                    </div>
                     <div class="result-relevance">Match: ${relevancePercent}%</div>
                     <div class="result-description">${escapeHtml(result.description)}</div>
                 </div>
@@ -578,6 +613,14 @@
             document.getElementById('modalTitle').textContent = result.title;
             document.getElementById('modalType').textContent = typeLabel;
             document.getElementById('modalRelevance').textContent = `Match: ${relevancePercent}%`;
+
+            const resolutionDiv = document.getElementById('modalResolution');
+            if (result.resolution) {
+                resolutionDiv.innerHTML = `<span class="resolution-badge">${escapeHtml(result.resolution)}</span>`;
+            } else {
+                resolutionDiv.innerHTML = '';
+            }
+
             document.getElementById('modalDescription').textContent = result.description;
 
             // Display rating
