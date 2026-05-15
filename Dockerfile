@@ -2,6 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Set environment variable to disable NumPy CPU optimization requirements
+ENV OPENBLAS=0
+ENV MKL_THREADING_LAYER=GNU
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
