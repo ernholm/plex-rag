@@ -203,6 +203,123 @@
             color: #666;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.2s;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s;
+            position: relative;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            flex: 1;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-poster {
+            width: 100%;
+            max-width: 300px;
+            height: 200px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .modal-poster img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .modal-meta {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .modal-badge {
+            display: inline-block;
+            background: #f0f0f0;
+            color: #666;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .modal-relevance {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .modal-description {
+            color: #333;
+            line-height: 1.6;
+            font-size: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
         .loading {
             display: flex;
             justify-content: center;
@@ -274,6 +391,21 @@
 
         <div class="no-results" id="noResults" style="display: none;">
             No results found. Try a different search query!
+        </div>
+
+        <div class="modal" id="detailModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle"></h2>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-poster" id="modalPoster"></div>
+                <div class="modal-meta">
+                    <span class="modal-badge" id="modalType"></span>
+                    <span class="modal-badge modal-relevance" id="modalRelevance"></span>
+                </div>
+                <div class="modal-description" id="modalDescription"></div>
+            </div>
         </div>
     </div>
 
@@ -367,7 +499,40 @@
                 </div>
             `;
 
+            card.onclick = () => showDetailModal(result);
             return card;
+        }
+
+        function showDetailModal(result) {
+            const modal = document.getElementById('detailModal');
+            const relevancePercent = Math.round(result.relevance * 100);
+            const typeLabel = result.type === 'tv_show' ? 'TV Show' : 'Movie';
+
+            document.getElementById('modalTitle').textContent = result.title;
+            document.getElementById('modalType').textContent = typeLabel;
+            document.getElementById('modalRelevance').textContent = `Match: ${relevancePercent}%`;
+            document.getElementById('modalDescription').textContent = result.description;
+
+            const posterDiv = document.getElementById('modalPoster');
+            if (result.poster_url) {
+                posterDiv.innerHTML = `<img src="${result.poster_url}" alt="${result.title}">`;
+            } else {
+                posterDiv.textContent = '🎬';
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target == modal) {
+                modal.classList.remove('active');
+            }
         }
 
         function escapeHtml(text) {
