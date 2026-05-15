@@ -9,6 +9,7 @@ services:
     environment:
       - PLEX_URL=${PLEX_URL:-http://host.docker.internal:32400}
       - PLEX_TOKEN=${PLEX_TOKEN}
+      - PLEX_SECTIONS=${PLEX_SECTIONS:-Movies,TV Shows}
     volumes:
       - plex_data:/app
     restart: unless-stopped
