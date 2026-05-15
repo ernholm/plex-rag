@@ -81,9 +81,62 @@ def init_db():
     conn.commit()
     conn.close()
 
+def index_item(item, item_type, plex_url, plex_token, embedder):
+    """Index a single movie or show item"""
+    indexed_count = 0
+
+    try:
+        description = item.summary or f"{item_type.replace('_', ' ').title()}: {item.title}"
+        chunks = chunk_description(description)
+
+        for chunk_idx, chunk in enumerate(chunks):
+            embedding = embedder.encode(chunk).tolist()
+
+            # Build full poster URL
+            poster_url = ""
+            if item.thumb:
+                poster_url = f"{plex_url}{item.thumb}?X-Plex-Token={plex_token}"
+
+            # Get actors (up to 5)
+            actors = []
+            try:
+                if hasattr(item, 'roles') and item.roles:
+                    actors = [actor.tag for actor in item.roles[:5]]
+            except:
+                pass
+
+            # Get rating
+            rating = getattr(item, 'rating', None)
+
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute('''
+                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                f"{item_type}_{item.key}_{chunk_idx}",
+                item.title,
+                item_type,
+                item.summary or "",
+                str(item.key),
+                poster_url,
+                rating,
+                json.dumps(actors),
+                json.dumps(embedding)
+            ))
+            conn.commit()
+            conn.close()
+            indexed_count += 1
+
+        logger.info(f"Indexed {item_type}: {item.title}")
+    except Exception as e:
+        logger.warning(f"Failed to index {item_type} {item.title}: {e}")
+
+    return indexed_count
+
 def index_plex_library(embedder):
     """
-    Index all Plex library content
+    Index all configured Plex library sections
     Returns count of indexed items
     """
     init_db()
@@ -98,125 +151,40 @@ def index_plex_library(embedder):
     plex_url = os.getenv("PLEX_URL", "http://localhost:32400")
     plex_token = os.getenv("PLEX_TOKEN")
 
-    # Clear existing database
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('DELETE FROM embeddings')
-    conn.commit()
-    conn.close()
-    logger.info("Cleared existing index")
+    # Get configured sections to index
+    sections_config = os.getenv("PLEX_SECTIONS", "Movies,TV Shows")
+    sections_to_index = [s.strip() for s in sections_config.split(",") if s.strip()]
+
+    logger.info(f"Sections to index: {sections_to_index}")
+
+    # Get all available sections
+    available_sections = {section.title: section for section in plex.library.sections()}
+    logger.info(f"Available sections: {list(available_sections.keys())}")
 
     indexed_count = 0
 
-    # Index movies
-    try:
-        movie_section = plex.library.section("Movies")
-        for movie in movie_section.all():
-            try:
-                description = movie.summary or f"Movie: {movie.title}"
-                chunks = chunk_description(description)
+    # Index each configured section
+    for section_name in sections_to_index:
+        if section_name not in available_sections:
+            logger.warning(f"Section '{section_name}' not found. Available: {list(available_sections.keys())}")
+            continue
 
-                for chunk_idx, chunk in enumerate(chunks):
-                    embedding = embedder.encode(chunk).tolist()
+        section = available_sections[section_name]
+        section_type = section.type
 
-                    # Build full poster URL
-                    poster_url = ""
-                    if movie.thumb:
-                        poster_url = f"{plex_url}{movie.thumb}?X-Plex-Token={plex_token}"
+        logger.info(f"Indexing section: {section_name} (type: {section_type})")
 
-                    # Get actors (up to 5)
-                    actors = []
-                    try:
-                        if hasattr(movie, 'roles') and movie.roles:
-                            actors = [actor.tag for actor in movie.roles[:5]]
-                    except:
-                        pass
-
-                    # Get rating
-                    rating = getattr(movie, 'rating', None)
-
-                    conn = sqlite3.connect(DB_PATH)
-                    c = conn.cursor()
-                    c.execute('''
-                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, embedding)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        f"movie_{movie.key}_{chunk_idx}",
-                        movie.title,
-                        "movie",
-                        movie.summary or "",
-                        str(movie.key),
-                        poster_url,
-                        rating,
-                        json.dumps(actors),
-                        json.dumps(embedding)
-                    ))
-                    conn.commit()
-                    conn.close()
-                    indexed_count += 1
-
-                logger.info(f"Indexed movie: {movie.title}")
-            except Exception as e:
-                logger.warning(f"Failed to index movie {movie.title}: {e}")
-                continue
-
-    except Exception as e:
-        logger.warning(f"Could not access Movies section: {e}")
-
-    # Index TV shows
-    try:
-        tv_section = plex.library.section("TV Shows")
-        for show in tv_section.all():
-            try:
-                description = show.summary or f"TV Show: {show.title}"
-                chunks = chunk_description(description)
-
-                for chunk_idx, chunk in enumerate(chunks):
-                    embedding = embedder.encode(chunk).tolist()
-
-                    # Build full poster URL
-                    poster_url = ""
-                    if show.thumb:
-                        poster_url = f"{plex_url}{show.thumb}?X-Plex-Token={plex_token}"
-
-                    # Get actors (up to 5)
-                    actors = []
-                    try:
-                        if hasattr(show, 'roles') and show.roles:
-                            actors = [actor.tag for actor in show.roles[:5]]
-                    except:
-                        pass
-
-                    # Get rating
-                    rating = getattr(show, 'rating', None)
-
-                    conn = sqlite3.connect(DB_PATH)
-                    c = conn.cursor()
-                    c.execute('''
-                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, embedding)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        f"show_{show.key}_{chunk_idx}",
-                        show.title,
-                        "tv_show",
-                        show.summary or "",
-                        str(show.key),
-                        poster_url,
-                        rating,
-                        json.dumps(actors),
-                        json.dumps(embedding)
-                    ))
-                    conn.commit()
-                    conn.close()
-                    indexed_count += 1
-
-                logger.info(f"Indexed TV show: {show.title}")
-            except Exception as e:
-                logger.warning(f"Failed to index show {show.title}: {e}")
-                continue
-
-    except Exception as e:
-        logger.warning(f"Could not access TV Shows section: {e}")
+        try:
+            if section_type == "movie":
+                for movie in section.all():
+                    indexed_count += index_item(movie, "movie", plex_url, plex_token, embedder)
+            elif section_type == "show":
+                for show in section.all():
+                    indexed_count += index_item(show, "tv_show", plex_url, plex_token, embedder)
+            else:
+                logger.warning(f"Unsupported section type: {section_type}")
+        except Exception as e:
+            logger.error(f"Error indexing section {section_name}: {e}")
 
     logger.info(f"Indexing complete. Total chunks indexed: {indexed_count}")
     return indexed_count
