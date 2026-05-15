@@ -2,11 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import chromadb
-from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
+import sqlite3
+import json
 import os
 from pathlib import Path
+from typing import List
 
 # Initialize FastAPI app
 app = FastAPI(title="Plex RAG Search")
@@ -23,19 +24,38 @@ app.add_middleware(
 # Initialize embedding model
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Initialize Chroma client
-db_dir = Path("./chroma_db")
-db_dir.mkdir(exist_ok=True)
-client = chromadb.PersistentClient(path=str(db_dir))
+# Database setup
+DB_PATH = "./plex_embeddings.db"
 
-# Get or create collection
-try:
-    collection = client.get_collection(name="plex_library")
-except:
-    collection = client.create_collection(
-        name="plex_library",
-        metadata={"hnsw:space": "cosine"}
-    )
+def init_db():
+    """Initialize SQLite database for embeddings"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS embeddings (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            plex_key TEXT,
+            poster_url TEXT,
+            embedding BLOB NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def cosine_similarity(vec1, vec2):
+    """Calculate cosine similarity between two vectors"""
+    import math
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+    mag1 = math.sqrt(sum(a * a for a in vec1))
+    mag2 = math.sqrt(sum(b * b for b in vec2))
+    if mag1 == 0 or mag2 == 0:
+        return 0
+    return dot_product / (mag1 * mag2)
+
+init_db()
 
 # Models
 class SearchQuery(BaseModel):
@@ -64,37 +84,55 @@ async def search(query_data: SearchQuery):
     """Search the Plex library using semantic search"""
     try:
         # Embed the query
-        query_embedding = embedder.encode(query_data.query).tolist()
+        query_embedding = embedder.encode(query_data.query)
 
-        # Search in Chroma
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=query_data.limit,
-            include=["documents", "metadatas", "distances"]
-        )
+        # Get all embeddings from database
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT id, title, type, description, plex_key, poster_url, embedding FROM embeddings')
+        rows = c.fetchall()
+        conn.close()
 
-        if not results["ids"] or not results["ids"][0]:
+        if not rows:
             return []
 
-        # Transform results
-        search_results = []
-        for i, doc_id in enumerate(results["ids"][0]):
-            metadata = results["metadatas"][0][i]
-            distance = results["distances"][0][i]
-            # Convert distance to relevance score (cosine distance -> similarity)
-            relevance = 1 - distance
+        # Calculate similarity for all rows
+        results = []
+        for row in rows:
+            doc_id, title, doc_type, description, plex_key, poster_url, embedding_blob = row
 
-            result = SearchResult(
-                title=metadata.get("title", "Unknown"),
-                type=metadata.get("type", "unknown"),
-                description=metadata.get("description", ""),
-                relevance=round(relevance, 3),
-                plex_key=metadata.get("plex_key", ""),
-                poster_url=metadata.get("poster_url", "")
+            # Deserialize embedding
+            embedding = json.loads(embedding_blob)
+
+            # Calculate similarity
+            similarity = cosine_similarity(query_embedding, embedding)
+
+            results.append({
+                'id': doc_id,
+                'title': title,
+                'type': doc_type,
+                'description': description,
+                'plex_key': plex_key,
+                'poster_url': poster_url,
+                'similarity': similarity
+            })
+
+        # Sort by similarity and take top N
+        results.sort(key=lambda x: x['similarity'], reverse=True)
+        top_results = results[:query_data.limit]
+
+        return [
+            SearchResult(
+                title=r['title'],
+                type=r['type'],
+                description=r['description'],
+                relevance=round(r['similarity'], 3),
+                plex_key=r['plex_key'],
+                poster_url=r['poster_url']
             )
-            search_results.append(result)
+            for r in top_results
+        ]
 
-        return search_results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
@@ -102,7 +140,12 @@ async def search(query_data: SearchQuery):
 async def index_status():
     """Get indexing status"""
     try:
-        count = collection.count()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM embeddings')
+        count = c.fetchone()[0]
+        conn.close()
+
         return IndexStatusResponse(
             total_items=count,
             status="indexed" if count > 0 else "empty"
@@ -114,10 +157,8 @@ async def index_status():
 async def rebuild_index():
     """Trigger a rebuild of the index from Plex"""
     try:
-        # Import here to avoid circular dependency
         from indexer import index_plex_library
-
-        count = index_plex_library(collection, embedder)
+        count = index_plex_library(embedder)
         return {
             "status": "indexed",
             "items_indexed": count

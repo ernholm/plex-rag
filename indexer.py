@@ -1,13 +1,17 @@
 """
 Indexer for Plex library
-Fetches metadata from Plex and creates embeddings for ChromaDB
+Fetches metadata from Plex and creates embeddings, storing in SQLite
 """
 import os
 from plexapi.server import PlexServer
 import logging
+import sqlite3
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+DB_PATH = "./plex_embeddings.db"
 
 def get_plex_connection():
     """Connect to Plex server"""
@@ -55,23 +59,46 @@ def chunk_description(text, chunk_size=300, overlap=50):
 
     return chunks or [text]
 
-def index_plex_library(collection, embedder):
+def init_db():
+    """Initialize SQLite database"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS embeddings (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            plex_key TEXT,
+            poster_url TEXT,
+            embedding BLOB NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def index_plex_library(embedder):
     """
     Index all Plex library content
     Returns count of indexed items
     """
+    init_db()
+
     try:
         plex = get_plex_connection()
     except Exception as e:
         logger.error(f"Plex connection error: {e}")
         return 0
 
-    # Clear existing collection
-    collection.delete(where={})
+    # Clear existing database
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('DELETE FROM embeddings')
+    conn.commit()
+    conn.close()
     logger.info("Cleared existing index")
 
     indexed_count = 0
-    item_id = 0
 
     # Index movies
     try:
@@ -84,19 +111,22 @@ def index_plex_library(collection, embedder):
                 for chunk_idx, chunk in enumerate(chunks):
                     embedding = embedder.encode(chunk).tolist()
 
-                    collection.add(
-                        ids=[f"movie_{movie.key}_{chunk_idx}"],
-                        embeddings=[embedding],
-                        documents=[chunk],
-                        metadatas=[{
-                            "title": movie.title,
-                            "type": "movie",
-                            "description": movie.summary or "",
-                            "plex_key": str(movie.key),
-                            "poster_url": movie.thumb or "",
-                            "year": movie.year or 0,
-                        }]
-                    )
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute('''
+                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, embedding)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        f"movie_{movie.key}_{chunk_idx}",
+                        movie.title,
+                        "movie",
+                        movie.summary or "",
+                        str(movie.key),
+                        movie.thumb or "",
+                        json.dumps(embedding)
+                    ))
+                    conn.commit()
+                    conn.close()
                     indexed_count += 1
 
                 logger.info(f"Indexed movie: {movie.title}")
@@ -118,19 +148,22 @@ def index_plex_library(collection, embedder):
                 for chunk_idx, chunk in enumerate(chunks):
                     embedding = embedder.encode(chunk).tolist()
 
-                    collection.add(
-                        ids=[f"show_{show.key}_{chunk_idx}"],
-                        embeddings=[embedding],
-                        documents=[chunk],
-                        metadatas=[{
-                            "title": show.title,
-                            "type": "tv_show",
-                            "description": show.summary or "",
-                            "plex_key": str(show.key),
-                            "poster_url": show.thumb or "",
-                            "year": show.year or 0,
-                        }]
-                    )
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute('''
+                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, embedding)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        f"show_{show.key}_{chunk_idx}",
+                        show.title,
+                        "tv_show",
+                        show.summary or "",
+                        str(show.key),
+                        show.thumb or "",
+                        json.dumps(embedding)
+                    ))
+                    conn.commit()
+                    conn.close()
                     indexed_count += 1
 
                 logger.info(f"Indexed TV show: {show.title}")
@@ -146,24 +179,7 @@ def index_plex_library(collection, embedder):
 
 if __name__ == "__main__":
     from sentence_transformers import SentenceTransformer
-    import chromadb
-    from pathlib import Path
-
-    # Setup
-    db_dir = Path("./chroma_db")
-    db_dir.mkdir(exist_ok=True)
-    client = chromadb.PersistentClient(path=str(db_dir))
-
-    try:
-        collection = client.get_collection(name="plex_library")
-    except:
-        collection = client.create_collection(
-            name="plex_library",
-            metadata={"hnsw:space": "cosine"}
-        )
 
     embedder = SentenceTransformer('all-MiniLM-L6-v2')
-
-    # Run indexing
-    count = index_plex_library(collection, embedder)
+    count = index_plex_library(embedder)
     print(f"\n✓ Successfully indexed {count} chunks")
