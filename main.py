@@ -7,7 +7,7 @@ import sqlite3
 import json
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # Initialize FastAPI app
 app = FastAPI(title="Plex RAG Search")
@@ -69,11 +69,11 @@ class SearchResult(BaseModel):
     relevance: float
     plex_key: str
     poster_url: str
-    rating: float = None
+    rating: Optional[float] = None
     actors: List[str] = []
-    year: int = None
-    duration: int = None
-    director: str = None
+    year: Optional[int] = None
+    duration: Optional[int] = None
+    director: Optional[str] = None
     genres: List[str] = []
 
 class IndexStatusResponse(BaseModel):
