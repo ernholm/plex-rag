@@ -7,11 +7,14 @@ from plexapi.server import PlexServer
 import logging
 import sqlite3
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DB_PATH = "./plex_embeddings.db"
+MAX_WORKERS = 4  # Number of concurrent threads for fetching metadata
 
 def get_plex_connection():
     """Connect to Plex server"""
@@ -237,14 +240,27 @@ def index_plex_library(embedder):
         logger.info(f"Indexing section: {section_name} (type: {section_type})")
 
         try:
-            if section_type == "movie":
-                for movie in section.all():
-                    indexed_count += index_item(movie, "movie", plex_url, plex_token, embedder)
-            elif section_type == "show":
-                for show in section.all():
-                    indexed_count += index_item(show, "tv_show", plex_url, plex_token, embedder)
-            else:
-                logger.warning(f"Unsupported section type: {section_type}")
+            items = list(section.all())
+            item_type = "movie" if section_type == "movie" else "tv_show"
+            logger.info(f"Found {len(items)} items in {section_name}, processing with {MAX_WORKERS} workers...")
+
+            # Process items in parallel
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures = [
+                    executor.submit(index_item, item, item_type, plex_url, plex_token, embedder)
+                    for item in items
+                ]
+
+                completed = 0
+                for future in as_completed(futures):
+                    try:
+                        indexed_count += future.result()
+                        completed += 1
+                        if completed % 10 == 0:
+                            logger.info(f"Progress: {completed}/{len(items)} items processed")
+                    except Exception as e:
+                        logger.error(f"Error in parallel task: {e}")
+
         except Exception as e:
             logger.error(f"Error indexing section {section_name}: {e}")
 
