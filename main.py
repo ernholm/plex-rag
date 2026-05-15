@@ -87,15 +87,32 @@ def extract_metadata_filters(query, all_actors, all_genres):
     matched_actors = []
     matched_genres = []
 
-    # Check for actor names (case-insensitive)
+    # Check for actor names (case-insensitive, exact and partial matches)
     for actor in all_actors:
-        if actor.lower() in query_lower:
-            matched_actors.append(actor)
+        actor_lower = actor.lower()
+        # Exact match or word boundary match
+        if actor_lower in query_lower:
+            # Check it's not a substring of a larger word
+            query_parts = query_lower.split()
+            actor_parts = actor_lower.split()
+            # If single word actor, check if any query word starts with it
+            if len(actor_parts) == 1:
+                if any(part.startswith(actor_lower) or actor_lower in part for part in query_parts):
+                    matched_actors.append(actor)
+            else:
+                # Multi-word actor name
+                if actor_lower in query_lower:
+                    matched_actors.append(actor)
 
     # Check for genre names (case-insensitive)
     for genre in all_genres:
         if genre.lower() in query_lower:
             matched_genres.append(genre)
+
+    # Log what we found for debugging
+    if matched_actors or matched_genres:
+        import logging
+        logging.getLogger(__name__).debug(f"Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
 
     return matched_actors, matched_genres
 
@@ -104,7 +121,9 @@ init_db()
 # Models
 class SearchQuery(BaseModel):
     query: str
-    limit: int = 10
+    limit: int = 12
+    min_relevance: float = 0.30
+    strict_filter: bool = False
 
 class SearchResult(BaseModel):
     title: str
@@ -181,11 +200,12 @@ async def search(query_data: SearchQuery):
                 # Boost score for metadata matches
                 metadata_boost = 0
 
-                # Boost if result has matching actor
+                # Boost if result has matching actor (significantly higher boost)
                 if matched_actors and actors:
-                    for actor in actors:
-                        if any(actor.lower() == ma.lower() for ma in matched_actors):
-                            metadata_boost += 0.15
+                    matching_actors = [a for a in actors if any(a.lower() == ma.lower() for ma in matched_actors)]
+                    if matching_actors:
+                        # +0.25 per matching actor (up from +0.15)
+                        metadata_boost += min(0.30, 0.25 * len(matching_actors))
 
                 # Boost if result has matching genre
                 if matched_genres and genres:
@@ -233,7 +253,49 @@ async def search(query_data: SearchQuery):
 
         # Sort by similarity and take top N
         deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
-        top_results = deduped_results[:query_data.limit]
+
+        # Apply strict filtering if enabled: only return results with matching actors/genres
+        if query_data.strict_filter and (matched_actors or matched_genres):
+            strict_filtered = []
+            for result in deduped_results:
+                has_matching_actor = False
+                has_matching_genre = False
+
+                # Check for matching actors
+                if matched_actors and result['actors']:
+                    result_actors_lower = [a.lower() for a in result['actors']]
+                    has_matching_actor = any(
+                        ma.lower() in result_actors_lower
+                        for ma in matched_actors
+                    )
+
+                # Check for matching genres
+                if matched_genres and result['genres']:
+                    result_genres_lower = [g.lower() for g in result['genres']]
+                    has_matching_genre = any(
+                        mg.lower() in result_genres_lower
+                        for mg in matched_genres
+                    )
+
+                # Include result if it matches required filters
+                # If both actors and genres mentioned, require at least one of each
+                # If only actors mentioned, require at least one actor
+                # If only genres mentioned, require at least one genre
+                if matched_actors and matched_genres:
+                    if has_matching_actor and has_matching_genre:
+                        strict_filtered.append(result)
+                elif matched_actors:
+                    if has_matching_actor:
+                        strict_filtered.append(result)
+                elif matched_genres:
+                    if has_matching_genre:
+                        strict_filtered.append(result)
+
+            deduped_results = strict_filtered
+
+        # Filter by minimum relevance threshold and limit results
+        filtered_results = [r for r in deduped_results if r['similarity'] >= query_data.min_relevance]
+        top_results = filtered_results[:query_data.limit]
 
         return [
             SearchResult(

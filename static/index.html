@@ -461,15 +461,26 @@
                     placeholder="e.g., 'movies with supernatural monsters' or 'comedies from the 80s'"
                     autocomplete="off"
                 >
-                <select id="limitSelect" style="padding: 12px 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;">
+                <select id="limitSelect" style="padding: 12px 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" title="Maximum results to show">
                     <option value="12">12 Results</option>
                     <option value="25">25 Results</option>
                     <option value="50">50 Results</option>
                     <option value="100">100 Results</option>
                 </select>
+                <select id="thresholdSelect" style="padding: 12px 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" title="Minimum match quality">
+                    <option value="0.20">20% Quality</option>
+                    <option value="0.30" selected>30% Quality</option>
+                    <option value="0.40">40% Quality</option>
+                    <option value="0.50">50% Quality</option>
+                    <option value="0.60">60% Quality</option>
+                </select>
                 <button onclick="performSearch()">Search</button>
                 <button onclick="rebuildIndex()" style="background: #764ba2;">⟳ Rebuild</button>
             </div>
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #333; font-size: 0.9rem;">
+                <input type="checkbox" id="strictFilter" style="width: 18px; height: 18px; cursor: pointer;">
+                <span>Strict Filtering (require mentioned actors/genres)</span>
+            </label>
             <div class="status" id="status">Ready to search</div>
             <div class="error" id="error"></div>
         </div>
@@ -528,6 +539,8 @@
             }
 
             const limit = parseInt(document.getElementById('limitSelect').value);
+            const threshold = parseFloat(document.getElementById('thresholdSelect').value);
+            const strictFilter = document.getElementById('strictFilter').checked;
 
             statusDiv.innerHTML = '<div class="loading"><span>●</span><span>●</span><span>●</span></div>';
             errorDiv.classList.remove('active');
@@ -542,7 +555,9 @@
                     },
                     body: JSON.stringify({
                         query: query,
-                        limit: limit
+                        limit: limit,
+                        min_relevance: threshold,
+                        strict_filter: strictFilter
                     })
                 });
 
