@@ -275,7 +275,6 @@
         .modal-poster {
             width: 100%;
             max-width: 300px;
-            height: 200px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 8px;
             margin-bottom: 20px;
@@ -287,8 +286,8 @@
 
         .modal-poster img {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
+            height: auto;
+            object-fit: contain;
         }
 
         .modal-meta {
@@ -318,6 +317,35 @@
             font-size: 1rem;
             white-space: pre-wrap;
             word-wrap: break-word;
+        }
+
+        .modal-rating {
+            font-size: 1.2rem;
+            color: #ffc107;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .modal-section-title {
+            font-weight: 600;
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+        }
+
+        .modal-actors {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .actor-tag {
+            background: #e8e8ff;
+            color: #667eea;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
         }
 
         .loading {
@@ -404,7 +432,9 @@
                     <span class="modal-badge" id="modalType"></span>
                     <span class="modal-badge modal-relevance" id="modalRelevance"></span>
                 </div>
+                <div class="modal-rating" id="modalRating"></div>
                 <div class="modal-description" id="modalDescription"></div>
+                <div id="modalActorsSection"></div>
             </div>
         </div>
     </div>
@@ -512,6 +542,28 @@
             document.getElementById('modalType').textContent = typeLabel;
             document.getElementById('modalRelevance').textContent = `Match: ${relevancePercent}%`;
             document.getElementById('modalDescription').textContent = result.description;
+
+            // Display rating
+            const ratingDiv = document.getElementById('modalRating');
+            if (result.rating) {
+                ratingDiv.innerHTML = `★ ${result.rating.toFixed(1)}/10`;
+            } else {
+                ratingDiv.textContent = '';
+            }
+
+            // Display actors
+            const actorsSection = document.getElementById('modalActorsSection');
+            if (result.actors && result.actors.length > 0) {
+                const actorTags = result.actors
+                    .map(actor => `<span class="actor-tag">${escapeHtml(actor)}</span>`)
+                    .join('');
+                actorsSection.innerHTML = `
+                    <div class="modal-section-title">Cast</div>
+                    <div class="modal-actors">${actorTags}</div>
+                `;
+            } else {
+                actorsSection.innerHTML = '';
+            }
 
             const posterDiv = document.getElementById('modalPoster');
             if (result.poster_url) {

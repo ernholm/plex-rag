@@ -71,6 +71,8 @@ def init_db():
             description TEXT,
             plex_key TEXT,
             poster_url TEXT,
+            rating REAL,
+            actors TEXT,
             embedding BLOB NOT NULL
         )
     ''')
@@ -120,11 +122,22 @@ def index_plex_library(embedder):
                     if movie.thumb:
                         poster_url = f"{plex_url}{movie.thumb}?X-Plex-Token={plex_token}"
 
+                    # Get actors (up to 5)
+                    actors = []
+                    try:
+                        if hasattr(movie, 'roles') and movie.roles:
+                            actors = [actor.tag for actor in movie.roles[:5]]
+                    except:
+                        pass
+
+                    # Get rating
+                    rating = getattr(movie, 'rating', None)
+
                     conn = sqlite3.connect(DB_PATH)
                     c = conn.cursor()
                     c.execute('''
-                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, embedding)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, embedding)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         f"movie_{movie.key}_{chunk_idx}",
                         movie.title,
@@ -132,6 +145,8 @@ def index_plex_library(embedder):
                         movie.summary or "",
                         str(movie.key),
                         poster_url,
+                        rating,
+                        json.dumps(actors),
                         json.dumps(embedding)
                     ))
                     conn.commit()
@@ -162,11 +177,22 @@ def index_plex_library(embedder):
                     if show.thumb:
                         poster_url = f"{plex_url}{show.thumb}?X-Plex-Token={plex_token}"
 
+                    # Get actors (up to 5)
+                    actors = []
+                    try:
+                        if hasattr(show, 'roles') and show.roles:
+                            actors = [actor.tag for actor in show.roles[:5]]
+                    except:
+                        pass
+
+                    # Get rating
+                    rating = getattr(show, 'rating', None)
+
                     conn = sqlite3.connect(DB_PATH)
                     c = conn.cursor()
                     c.execute('''
-                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, embedding)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, embedding)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         f"show_{show.key}_{chunk_idx}",
                         show.title,
@@ -174,6 +200,8 @@ def index_plex_library(embedder):
                         show.summary or "",
                         str(show.key),
                         poster_url,
+                        rating,
+                        json.dumps(actors),
                         json.dumps(embedding)
                     ))
                     conn.commit()
