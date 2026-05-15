@@ -75,6 +75,10 @@ def init_db():
             poster_url TEXT,
             rating REAL,
             actors TEXT,
+            year INTEGER,
+            duration INTEGER,
+            director TEXT,
+            genres TEXT,
             embedding BLOB NOT NULL
         )
     ''')
@@ -108,11 +112,35 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
             # Get rating
             rating = getattr(item, 'rating', None)
 
+            # Get year
+            year = getattr(item, 'year', None)
+
+            # Get duration (in minutes)
+            duration = getattr(item, 'duration', None)
+            if duration:
+                duration = duration // 60000  # Convert from milliseconds to minutes
+
+            # Get director (usually in the directors list)
+            director = ""
+            try:
+                if hasattr(item, 'directors') and item.directors:
+                    director = item.directors[0].tag
+            except:
+                pass
+
+            # Get genres (up to 3)
+            genres = []
+            try:
+                if hasattr(item, 'genres') and item.genres:
+                    genres = [genre.tag for genre in item.genres[:3]]
+            except:
+                pass
+
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute('''
-                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 f"{item_type}_{item.key}_{chunk_idx}",
                 item.title,
@@ -122,6 +150,10 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
                 poster_url,
                 rating,
                 json.dumps(actors),
+                year,
+                duration,
+                director,
+                json.dumps(genres),
                 json.dumps(embedding)
             ))
             conn.commit()

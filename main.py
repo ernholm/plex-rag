@@ -71,6 +71,10 @@ class SearchResult(BaseModel):
     poster_url: str
     rating: float = None
     actors: List[str] = []
+    year: int = None
+    duration: int = None
+    director: str = None
+    genres: List[str] = []
 
 class IndexStatusResponse(BaseModel):
     total_items: int
@@ -91,7 +95,7 @@ async def search(query_data: SearchQuery):
         # Get all embeddings from database
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, embedding FROM embeddings')
+        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, embedding FROM embeddings')
         rows = c.fetchall()
         conn.close()
 
@@ -102,11 +106,12 @@ async def search(query_data: SearchQuery):
         results = []
         for row in rows:
             try:
-                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, embedding_blob = row
+                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, embedding_blob = row
 
-                # Deserialize embedding and actors
+                # Deserialize embedding, actors, and genres
                 embedding = json.loads(embedding_blob)
                 actors = json.loads(actors_json) if actors_json else []
+                genres = json.loads(genres_json) if genres_json else []
 
                 # Calculate similarity
                 similarity = cosine_similarity(query_embedding, embedding)
@@ -120,6 +125,10 @@ async def search(query_data: SearchQuery):
                     'poster_url': poster_url,
                     'rating': rating,
                     'actors': actors,
+                    'year': year,
+                    'duration': duration,
+                    'director': director,
+                    'genres': genres,
                     'similarity': similarity
                 })
             except Exception as e:
@@ -139,7 +148,11 @@ async def search(query_data: SearchQuery):
                 plex_key=r['plex_key'],
                 poster_url=r['poster_url'],
                 rating=r['rating'],
-                actors=r['actors']
+                actors=r['actors'],
+                year=r['year'],
+                duration=r['duration'],
+                director=r['director'],
+                genres=r['genres']
             )
             for r in top_results
         ]

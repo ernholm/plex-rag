@@ -348,6 +348,41 @@
             font-size: 0.85rem;
         }
 
+        .modal-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+
+        .detail-item {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            color: #333;
+        }
+
+        .genre-tag {
+            background: #f0e8ff;
+            color: #764ba2;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-right: 6px;
+            margin-top: 4px;
+        }
+
         .loading {
             display: flex;
             justify-content: center;
@@ -433,7 +468,9 @@
                     <span class="modal-badge modal-relevance" id="modalRelevance"></span>
                 </div>
                 <div class="modal-rating" id="modalRating"></div>
+                <div class="modal-details" id="modalDetails"></div>
                 <div class="modal-description" id="modalDescription"></div>
+                <div id="modalGenresSection"></div>
                 <div id="modalActorsSection"></div>
             </div>
         </div>
@@ -549,6 +586,39 @@
                 ratingDiv.innerHTML = `★ ${result.rating.toFixed(1)}/10`;
             } else {
                 ratingDiv.textContent = '';
+            }
+
+            // Display details (year, duration, director)
+            const detailsDiv = document.getElementById('modalDetails');
+            let detailsHTML = '';
+            if (result.year) {
+                detailsHTML += `<div class="detail-item"><div class="detail-label">Year</div><div class="detail-value">${result.year}</div></div>`;
+            }
+            if (result.duration) {
+                const hours = Math.floor(result.duration / 60);
+                const minutes = result.duration % 60;
+                let durationStr = '';
+                if (hours > 0) durationStr += `${hours}h `;
+                if (minutes > 0) durationStr += `${minutes}m`;
+                detailsHTML += `<div class="detail-item"><div class="detail-label">Duration</div><div class="detail-value">${durationStr}</div></div>`;
+            }
+            if (result.director) {
+                detailsHTML += `<div class="detail-item"><div class="detail-label">Director</div><div class="detail-value">${escapeHtml(result.director)}</div></div>`;
+            }
+            detailsDiv.innerHTML = detailsHTML;
+
+            // Display genres
+            const genresSection = document.getElementById('modalGenresSection');
+            if (result.genres && result.genres.length > 0) {
+                const genreTags = result.genres
+                    .map(genre => `<span class="genre-tag">${escapeHtml(genre)}</span>`)
+                    .join('');
+                genresSection.innerHTML = `
+                    <div class="modal-section-title">Genres</div>
+                    <div>${genreTags}</div>
+                `;
+            } else {
+                genresSection.innerHTML = '';
             }
 
             // Display actors
