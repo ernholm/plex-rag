@@ -25,7 +25,8 @@ def get_plex_connection():
         )
 
     try:
-        server = PlexServer(plex_url, plex_token)
+        # Increase timeout to 60 seconds for slow connections
+        server = PlexServer(plex_url, plex_token, timeout=60)
         logger.info(f"Connected to Plex server: {server.friendlyName}")
         return server
     except Exception as e:
@@ -91,7 +92,13 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
     indexed_count = 0
 
     try:
-        description = item.summary or f"{item_type.replace('_', ' ').title()}: {item.title}"
+        # Use basic title/summary if fetching full metadata times out
+        try:
+            description = item.summary or f"{item_type.replace('_', ' ').title()}: {item.title}"
+        except Exception as e:
+            logger.warning(f"Could not fetch full summary for {item.title}, using title only: {e}")
+            description = f"{item_type.replace('_', ' ').title()}: {item.title}"
+
         chunks = chunk_description(description)
 
         for chunk_idx, chunk in enumerate(chunks):
