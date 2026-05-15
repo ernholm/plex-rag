@@ -101,26 +101,30 @@ async def search(query_data: SearchQuery):
         # Calculate similarity for all rows
         results = []
         for row in rows:
-            doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, embedding_blob = row
+            try:
+                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, embedding_blob = row
 
-            # Deserialize embedding and actors
-            embedding = json.loads(embedding_blob)
-            actors = json.loads(actors_json) if actors_json else []
+                # Deserialize embedding and actors
+                embedding = json.loads(embedding_blob)
+                actors = json.loads(actors_json) if actors_json else []
 
-            # Calculate similarity
-            similarity = cosine_similarity(query_embedding, embedding)
+                # Calculate similarity
+                similarity = cosine_similarity(query_embedding, embedding)
 
-            results.append({
-                'id': doc_id,
-                'title': title,
-                'type': doc_type,
-                'description': description,
-                'plex_key': plex_key,
-                'poster_url': poster_url,
-                'rating': rating,
-                'actors': actors,
-                'similarity': similarity
-            })
+                results.append({
+                    'id': doc_id,
+                    'title': title,
+                    'type': doc_type,
+                    'description': description,
+                    'plex_key': plex_key,
+                    'poster_url': poster_url,
+                    'rating': rating,
+                    'actors': actors,
+                    'similarity': similarity
+                })
+            except Exception as e:
+                print(f"Error processing row: {e}")
+                continue
 
         # Sort by similarity and take top N
         results.sort(key=lambda x: x['similarity'], reverse=True)
@@ -141,6 +145,8 @@ async def search(query_data: SearchQuery):
         ]
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
 @app.get("/index-status", response_model=IndexStatusResponse)
