@@ -604,9 +604,10 @@
             try {
                 const response = await fetch('/rebuild-index', { method: 'POST' });
                 const data = await response.json();
-                statusDiv.textContent = `✓ Index rebuilt: ${data.items_indexed} items indexed`;
+                statusDiv.textContent = `✓ Index rebuilt: ${data.items_indexed} chunks indexed`;
                 btn.textContent = '⟳ Rebuild';
                 btn.disabled = false;
+                checkStatus(); // Refresh full status
             } catch (error) {
                 errorDiv.textContent = `Rebuild error: ${error.message}`;
                 errorDiv.classList.add('active');

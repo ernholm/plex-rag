@@ -156,12 +156,14 @@ async def index_status():
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('SELECT COUNT(*) FROM embeddings')
-        count = c.fetchone()[0]
+        total_chunks = c.fetchone()[0]
+        c.execute('SELECT COUNT(DISTINCT plex_key) FROM embeddings')
+        total_items = c.fetchone()[0]
         conn.close()
 
         return IndexStatusResponse(
-            total_items=count,
-            status="indexed" if count > 0 else "empty"
+            total_items=total_items,
+            status=f"indexed - {total_chunks} chunks from {total_items} items" if total_chunks > 0 else "empty"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status error: {str(e)}")
