@@ -87,22 +87,22 @@ def extract_metadata_filters(query, all_actors, all_genres):
     matched_actors = []
     matched_genres = []
 
-    # Check for actor names (case-insensitive, exact and partial matches)
+    # Check for actor names (case-insensitive)
     for actor in all_actors:
         actor_lower = actor.lower()
-        # Exact match or word boundary match
+        # Check exact substring match first
         if actor_lower in query_lower:
-            # Check it's not a substring of a larger word
-            query_parts = query_lower.split()
-            actor_parts = actor_lower.split()
-            # If single word actor, check if any query word starts with it
-            if len(actor_parts) == 1:
-                if any(part.startswith(actor_lower) or actor_lower in part for part in query_parts):
-                    matched_actors.append(actor)
-            else:
-                # Multi-word actor name
-                if actor_lower in query_lower:
-                    matched_actors.append(actor)
+            matched_actors.append(actor)
+        else:
+            # Check for partial matches (e.g., "Bruce" matching "Bruce Willis")
+            actor_words = actor_lower.split()
+            query_words = query_lower.split()
+            # If any word from actor name appears in query
+            if len(actor_words) > 1:
+                for word in actor_words:
+                    if len(word) > 3 and word in query_words:  # Skip short words
+                        matched_actors.append(actor)
+                        break
 
     # Check for genre names (case-insensitive)
     for genre in all_genres:
@@ -110,9 +110,7 @@ def extract_metadata_filters(query, all_actors, all_genres):
             matched_genres.append(genre)
 
     # Log what we found for debugging
-    if matched_actors or matched_genres:
-        import logging
-        logging.getLogger(__name__).debug(f"Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
+    logger.info(f"Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
 
     return matched_actors, matched_genres
 
@@ -256,6 +254,7 @@ async def search(query_data: SearchQuery):
 
         # Apply strict filtering if enabled: only return results with matching actors/genres
         if query_data.strict_filter and (matched_actors or matched_genres):
+            print(f"DEBUG: Strict filter enabled. Matched actors: {matched_actors}, Matched genres: {matched_genres}")
             strict_filtered = []
             for result in deduped_results:
                 has_matching_actor = False
@@ -264,33 +263,35 @@ async def search(query_data: SearchQuery):
                 # Check for matching actors
                 if matched_actors and result['actors']:
                     result_actors_lower = [a.lower() for a in result['actors']]
+                    # Check if any matched actor equals any result actor (case-insensitive)
                     has_matching_actor = any(
-                        ma.lower() in result_actors_lower
+                        ma.lower() == actor_name
                         for ma in matched_actors
+                        for actor_name in result_actors_lower
                     )
 
                 # Check for matching genres
                 if matched_genres and result['genres']:
                     result_genres_lower = [g.lower() for g in result['genres']]
                     has_matching_genre = any(
-                        mg.lower() in result_genres_lower
+                        mg.lower() == genre_name
                         for mg in matched_genres
+                        for genre_name in result_genres_lower
                     )
 
                 # Include result if it matches required filters
-                # If both actors and genres mentioned, require at least one of each
-                # If only actors mentioned, require at least one actor
-                # If only genres mentioned, require at least one genre
                 if matched_actors and matched_genres:
                     if has_matching_actor and has_matching_genre:
                         strict_filtered.append(result)
                 elif matched_actors:
                     if has_matching_actor:
                         strict_filtered.append(result)
+                        print(f"DEBUG: Included {result['title']} - has actor match")
                 elif matched_genres:
                     if has_matching_genre:
                         strict_filtered.append(result)
 
+            print(f"DEBUG: Strict filter results: {len(strict_filtered)} items")
             deduped_results = strict_filtered
 
         # Filter by minimum relevance threshold and limit results
