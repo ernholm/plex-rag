@@ -108,15 +108,17 @@ def extract_metadata_filters(query, all_actors, all_genres):
                     matched_actors.append(actor)
 
     # Check for genre names (case-insensitive, exact word match only)
+    # Only match if genre is ACTUALLY in the database (to avoid matching random words)
     for genre in all_genres:
         genre_lower = genre.lower()
         query_words = query_lower.split()
-        # Genre must be a complete word in the query
+        # Genre must be a complete word in the query AND be a real genre in the database
         if genre_lower in query_words:
             matched_genres.append(genre)
 
     # Log what we found for debugging
     print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
+    print(f"DEBUG: Available genres in database: {sorted(list(all_genres))[:20]}")
 
     return matched_actors, matched_genres
 
@@ -286,16 +288,21 @@ async def search(query_data: SearchQuery):
                     )
 
                 # Include result if it matches required filters
-                if matched_actors and matched_genres:
-                    if has_matching_actor and has_matching_genre:
-                        strict_filtered.append(result)
-                elif matched_actors:
-                    if has_matching_actor:
-                        strict_filtered.append(result)
-                        print(f"DEBUG: Included {result['title']} - has actor match")
+                # When both are mentioned: only strictly require actors (genres are used for ranking)
+                # When only actors: require actor match
+                # When only genres: require genre match
+                should_include = False
+
+                if matched_actors:
+                    # Actors are the primary filter - require actor match
+                    should_include = has_matching_actor
                 elif matched_genres:
-                    if has_matching_genre:
-                        strict_filtered.append(result)
+                    # Only genres mentioned (no actors) - require genre match
+                    should_include = has_matching_genre
+
+                if should_include:
+                    strict_filtered.append(result)
+                    print(f"DEBUG: Included {result['title']}")
 
             print(f"DEBUG: Strict filter results: {len(strict_filtered)} items")
             deduped_results = strict_filtered
