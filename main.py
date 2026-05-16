@@ -93,27 +93,30 @@ def extract_metadata_filters(query, all_actors, all_genres):
     # Check for actor names (case-insensitive)
     for actor in all_actors:
         actor_lower = actor.lower()
-        # Check exact substring match first
+        # Exact substring match - must match complete actor name
         if actor_lower in query_lower:
-            matched_actors.append(actor)
-        else:
-            # Check for partial matches (e.g., "Bruce" matching "Bruce Willis")
+            # Verify it's a complete word match (not part of another word)
+            # Check word boundaries
             actor_words = actor_lower.split()
-            query_words = query_lower.split()
-            # If any word from actor name appears in query
-            if len(actor_words) > 1:
-                for word in actor_words:
-                    if len(word) > 3 and word in query_words:  # Skip short words
-                        matched_actors.append(actor)
-                        break
+            if len(actor_words) >= 2:
+                # For multi-word names like "Bruce Willis", require full name match
+                matched_actors.append(actor)
+            elif len(actor_lower) > 4:
+                # For single names, require word boundary
+                query_words = query_lower.split()
+                if actor_lower in query_words:
+                    matched_actors.append(actor)
 
-    # Check for genre names (case-insensitive)
+    # Check for genre names (case-insensitive, exact word match only)
     for genre in all_genres:
-        if genre.lower() in query_lower:
+        genre_lower = genre.lower()
+        query_words = query_lower.split()
+        # Genre must be a complete word in the query
+        if genre_lower in query_words:
             matched_genres.append(genre)
 
     # Log what we found for debugging
-    logger.info(f"Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
+    print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
 
     return matched_actors, matched_genres
 
