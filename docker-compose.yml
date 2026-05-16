@@ -11,7 +11,7 @@ services:
       - PLEX_TOKEN=${PLEX_TOKEN}
       - PLEX_SECTIONS=${PLEX_SECTIONS:-Movies,TV Shows}
     volumes:
-      - plex_data:/app
+      - plex_data:/app/data
     restart: unless-stopped
     networks:
       - plex-network

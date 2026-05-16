@@ -13,7 +13,7 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "./plex_embeddings.db"
+DB_PATH = "/app/data/plex_embeddings.db"
 MAX_WORKERS = 4  # Number of concurrent threads for fetching metadata
 
 def get_plex_connection():

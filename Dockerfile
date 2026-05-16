@@ -32,6 +32,9 @@ COPY indexer.py .
 RUN mkdir -p static
 COPY static/ static/
 
+# Create data directory for database persistence
+RUN mkdir -p /app/data
+
 # Expose port
 EXPOSE 8000
 

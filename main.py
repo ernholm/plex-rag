@@ -31,7 +31,7 @@ app.add_middleware(
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Database setup
-DB_PATH = "./plex_embeddings.db"
+DB_PATH = "/app/data/plex_embeddings.db"
 
 def init_db():
     """Initialize SQLite database for embeddings"""
