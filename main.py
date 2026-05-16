@@ -93,6 +93,18 @@ def extract_metadata_filters(query, all_actors, all_genres):
     matched_actors = []
     matched_genres = []
 
+    # Common multi-word phrases that shouldn't be matched as genres
+    # These are semantic search concepts, not genre filters
+    excluded_phrases = [
+        'time travel', 'space opera', 'time machine', 'space travel',
+        'action packed', 'family friendly', 'science fiction'
+    ]
+
+    # Remove excluded phrases from consideration for genre matching
+    query_for_genres = query_lower
+    for phrase in excluded_phrases:
+        query_for_genres = query_for_genres.replace(phrase, '')
+
     # Check for actor names (case-insensitive)
     for actor in all_actors:
         actor_lower = actor.lower()
@@ -112,8 +124,8 @@ def extract_metadata_filters(query, all_actors, all_genres):
 
     # Check for genre names (case-insensitive)
     # Handle both single-word genres (e.g., "Comedy") and multi-word genres (e.g., "Science Fiction")
+    query_words_for_genres = query_for_genres.split()
     query_words = query_lower.split()
-    query_text = query_lower  # For substring matching
 
     for genre in all_genres:
         genre_lower = genre.lower()
@@ -121,15 +133,16 @@ def extract_metadata_filters(query, all_actors, all_genres):
 
         if len(genre_words) == 1:
             # Single-word genre: match as complete word only
-            if genre_lower in query_words:
+            # Use the cleaned query (without excluded phrases)
+            if genre_lower in query_words_for_genres:
                 matched_genres.append(genre)
         else:
             # Multi-word genre: check if words appear consecutively in query
             # e.g., "Science Fiction" should match in "bruce willis science fiction movies"
             found = False
-            for i in range(len(query_words) - len(genre_words) + 1):
+            for i in range(len(query_words_for_genres) - len(genre_words) + 1):
                 # Check if consecutive words in query match all words of genre
-                if query_words[i:i+len(genre_words)] == genre_words:
+                if query_words_for_genres[i:i+len(genre_words)] == genre_words:
                     found = True
                     break
             if found:
@@ -137,7 +150,8 @@ def extract_metadata_filters(query, all_actors, all_genres):
 
     # Log what we found for debugging
     print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
-    print(f"DEBUG: Query words: {query_words}")
+    print(f"DEBUG: Query words (original): {query_words}")
+    print(f"DEBUG: Query words (after phrase removal): {query_words_for_genres}")
     print(f"DEBUG: Available genres in database: {sorted(list(all_genres))[:30]}")
 
     return matched_actors, matched_genres
