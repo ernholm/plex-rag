@@ -12,6 +12,9 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Version tracking
+VERSION = "1.5.0"
+
 # Initialize FastAPI app
 app = FastAPI(title="Plex RAG Search")
 
@@ -107,18 +110,35 @@ def extract_metadata_filters(query, all_actors, all_genres):
                 if actor_lower in query_words:
                     matched_actors.append(actor)
 
-    # Check for genre names (case-insensitive, exact word match only)
-    # Only match if genre is ACTUALLY in the database (to avoid matching random words)
+    # Check for genre names (case-insensitive)
+    # Handle both single-word genres (e.g., "Comedy") and multi-word genres (e.g., "Science Fiction")
+    query_words = query_lower.split()
+    query_text = query_lower  # For substring matching
+
     for genre in all_genres:
         genre_lower = genre.lower()
-        query_words = query_lower.split()
-        # Genre must be a complete word in the query AND be a real genre in the database
-        if genre_lower in query_words:
-            matched_genres.append(genre)
+        genre_words = genre_lower.split()
+
+        if len(genre_words) == 1:
+            # Single-word genre: match as complete word only
+            if genre_lower in query_words:
+                matched_genres.append(genre)
+        else:
+            # Multi-word genre: check if words appear consecutively in query
+            # e.g., "Science Fiction" should match in "bruce willis science fiction movies"
+            found = False
+            for i in range(len(query_words) - len(genre_words) + 1):
+                # Check if consecutive words in query match all words of genre
+                if query_words[i:i+len(genre_words)] == genre_words:
+                    found = True
+                    break
+            if found:
+                matched_genres.append(genre)
 
     # Log what we found for debugging
     print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
-    print(f"DEBUG: Available genres in database: {sorted(list(all_genres))[:20]}")
+    print(f"DEBUG: Query words: {query_words}")
+    print(f"DEBUG: Available genres in database: {sorted(list(all_genres))[:30]}")
 
     return matched_actors, matched_genres
 
@@ -153,7 +173,7 @@ class IndexStatusResponse(BaseModel):
 # Routes
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": VERSION}
 
 @app.post("/search", response_model=list[SearchResult])
 async def search(query_data: SearchQuery):
@@ -353,6 +373,23 @@ async def index_status():
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status error: {str(e)}")
+
+@app.get("/debug/genres")
+async def debug_genres():
+    """Debug endpoint to see all genres in the database"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        all_actors, all_genres = get_all_metadata(conn)
+        conn.close()
+
+        return {
+            "total_genres": len(all_genres),
+            "genres": sorted(list(all_genres)),
+            "total_actors": len(all_actors),
+            "sample_actors": sorted(list(all_actors))[:20]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
 
 @app.post("/rebuild-index")
 async def rebuild_index():
