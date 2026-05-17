@@ -112,11 +112,11 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
             if item.thumb:
                 poster_url = f"{plex_url}{item.thumb}?X-Plex-Token={plex_token}"
 
-            # Get actors (up to 5)
+            # Get actors (up to 10)
             actors = []
             try:
                 if hasattr(item, 'roles') and item.roles:
-                    actors = [actor.tag for actor in item.roles[:5]]
+                    actors = [actor.tag for actor in item.roles[:10]]
             except:
                 pass
 

@@ -405,6 +405,22 @@ async def debug_genres():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
 
+@app.get("/debug/actors")
+async def debug_actors():
+    """Return a sample of movies with their stored actor lists"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT DISTINCT title, actors FROM embeddings WHERE actors IS NOT NULL LIMIT 20')
+        rows = c.fetchall()
+        conn.close()
+        return [
+            {"title": row[0], "actors": json.loads(row[1])}
+            for row in rows
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
+
 @app.post("/rebuild-index")
 async def rebuild_index():
     """Trigger a rebuild of the index from Plex"""
