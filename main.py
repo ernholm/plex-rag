@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -247,12 +247,11 @@ async def search(query_data: SearchQuery):
                 # Boost score for metadata matches
                 metadata_boost = 0
 
-                # Boost if result has matching actor (significantly higher boost)
+                # Boost if result has matching actor
                 if matched_actors and actors:
                     matching_actors = [a for a in actors if any(a.lower() == ma.lower() for ma in matched_actors)]
                     if matching_actors:
-                        # +0.25 per matching actor (up from +0.15)
-                        metadata_boost += min(0.30, 0.25 * len(matching_actors))
+                        metadata_boost += min(0.10, 0.08 * len(matching_actors))
 
                 # Boost if result has matching genre
                 if matched_genres and genres:
