@@ -123,8 +123,8 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
         except:
             pass
 
-        # Get rating
-        rating = getattr(item, 'rating', None)
+        # Get rating - prefer audienceRating, fall back to rating
+        rating = getattr(item, 'audienceRating', None) or getattr(item, 'rating', None)
 
         # Get year
         year = getattr(item, 'year', None)
