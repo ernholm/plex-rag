@@ -142,11 +142,23 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
         except:
             pass
 
-        # Get genres (up to 3)
+        # Get genres (up to 3), normalizing non-English names to English equivalents
+        genre_normalizations = {
+            'dokumentär': 'Documentary',
+            'familj': 'Family',
+            'komedi': 'Comedy',
+            'kriminal': 'Crime',
+            'mystik': 'Mystery',
+            'romantik': 'Romance',
+            'tv-film': 'TV Movie',
+        }
         genres = []
         try:
             if hasattr(item, 'genres') and item.genres:
-                genres = [genre.tag for genre in item.genres[:3]]
+                for genre in item.genres[:3]:
+                    normalized = genre_normalizations.get(genre.tag.lower(), genre.tag)
+                    if normalized not in genres:
+                        genres.append(normalized)
         except:
             pass
 

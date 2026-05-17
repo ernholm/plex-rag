@@ -13,7 +13,7 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 # Initialize FastAPI app
 app = FastAPI(title="Plex RAG Search")
