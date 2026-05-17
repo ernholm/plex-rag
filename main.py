@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.5"
+VERSION = "1.5.6"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -200,15 +200,21 @@ async def health():
 async def search(query_data: SearchQuery):
     """Search the Plex library using semantic search"""
     try:
-        # Embed the query
-        query_embedding = embedder.encode(query_data.query)
-
         # Get all embeddings from database
         conn = sqlite3.connect(DB_PATH)
 
         # Extract metadata filters from query
         all_actors, all_genres = get_all_metadata(conn)
         matched_actors, matched_genres = extract_metadata_filters(query_data.query, all_actors, all_genres)
+
+        # Strip matched actor names from query before embedding so semantic
+        # search focuses on concepts, not the actor name
+        semantic_query = query_data.query
+        for actor in matched_actors:
+            semantic_query = semantic_query.lower().replace(actor.lower(), "").strip()
+        semantic_query = semantic_query.strip() or query_data.query
+
+        query_embedding = embedder.encode(semantic_query)
 
         c = conn.cursor()
         c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, embedding FROM embeddings')
