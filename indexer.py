@@ -104,6 +104,12 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
 
         chunks = chunk_description(description)
 
+        # Reload full metadata (section.all() returns shallow objects with truncated cast)
+        try:
+            item.reload()
+        except Exception as e:
+            logger.warning(f"Could not reload full metadata for {item.title}: {e}")
+
         # Build full poster URL
         poster_url = ""
         if item.thumb:
