@@ -104,69 +104,69 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
 
         chunks = chunk_description(description)
 
+        # Build full poster URL
+        poster_url = ""
+        if item.thumb:
+            poster_url = f"{plex_url}{item.thumb}?X-Plex-Token={plex_token}"
+
+        # Get actors (up to 10)
+        actors = []
+        try:
+            if hasattr(item, 'roles') and item.roles:
+                actors = [actor.tag for actor in item.roles[:10]]
+        except:
+            pass
+
+        # Get rating
+        rating = getattr(item, 'rating', None)
+
+        # Get year
+        year = getattr(item, 'year', None)
+
+        # Get duration (in minutes)
+        duration = getattr(item, 'duration', None)
+        if duration:
+            duration = duration // 60000  # Convert from milliseconds to minutes
+
+        # Get director (usually in the directors list)
+        director = ""
+        try:
+            if hasattr(item, 'directors') and item.directors:
+                director = item.directors[0].tag
+        except:
+            pass
+
+        # Get genres (up to 3)
+        genres = []
+        try:
+            if hasattr(item, 'genres') and item.genres:
+                genres = [genre.tag for genre in item.genres[:3]]
+        except:
+            pass
+
+        # Get resolution
+        resolution = ""
+        try:
+            if hasattr(item, 'media') and item.media and len(item.media) > 0:
+                video_res = getattr(item.media[0], 'videoResolution', None)
+                if video_res:
+                    # Normalize resolution format
+                    res_lower = str(video_res).lower()
+                    if '4k' in res_lower or '2160' in res_lower:
+                        resolution = "4K"
+                    elif '1080' in res_lower:
+                        resolution = "1080p"
+                    elif '720' in res_lower:
+                        resolution = "720p"
+                    elif '480' in res_lower or '540' in res_lower:
+                        resolution = "SD"
+                    else:
+                        resolution = video_res
+        except:
+            pass
+
         for chunk_idx, chunk in enumerate(chunks):
             embedding = embedder.encode(chunk).tolist()
-
-            # Build full poster URL
-            poster_url = ""
-            if item.thumb:
-                poster_url = f"{plex_url}{item.thumb}?X-Plex-Token={plex_token}"
-
-            # Get actors (up to 10)
-            actors = []
-            try:
-                if hasattr(item, 'roles') and item.roles:
-                    actors = [actor.tag for actor in item.roles[:10]]
-            except:
-                pass
-
-            # Get rating
-            rating = getattr(item, 'rating', None)
-
-            # Get year
-            year = getattr(item, 'year', None)
-
-            # Get duration (in minutes)
-            duration = getattr(item, 'duration', None)
-            if duration:
-                duration = duration // 60000  # Convert from milliseconds to minutes
-
-            # Get director (usually in the directors list)
-            director = ""
-            try:
-                if hasattr(item, 'directors') and item.directors:
-                    director = item.directors[0].tag
-            except:
-                pass
-
-            # Get genres (up to 3)
-            genres = []
-            try:
-                if hasattr(item, 'genres') and item.genres:
-                    genres = [genre.tag for genre in item.genres[:3]]
-            except:
-                pass
-
-            # Get resolution
-            resolution = ""
-            try:
-                if hasattr(item, 'media') and item.media and len(item.media) > 0:
-                    video_res = getattr(item.media[0], 'videoResolution', None)
-                    if video_res:
-                        # Normalize resolution format
-                        res_lower = str(video_res).lower()
-                        if '4k' in res_lower or '2160' in res_lower:
-                            resolution = "4K"
-                        elif '1080' in res_lower:
-                            resolution = "1080p"
-                        elif '720' in res_lower:
-                            resolution = "720p"
-                        elif '480' in res_lower or '540' in res_lower:
-                            resolution = "SD"
-                        else:
-                            resolution = video_res
-            except:
-                pass
 
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
