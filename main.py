@@ -97,7 +97,7 @@ def extract_metadata_filters(query, all_actors, all_genres):
     # These are semantic search concepts, not genre filters
     excluded_phrases = [
         'time travel', 'space opera', 'time machine', 'space travel',
-        'action packed', 'family friendly', 'science fiction'
+        'action packed', 'family friendly'
     ]
 
     # Remove excluded phrases from consideration for genre matching
