@@ -84,6 +84,7 @@ def init_db():
             director TEXT,
             genres TEXT,
             resolution TEXT,
+            countries TEXT,
             embedding BLOB NOT NULL
         )
     ''')
@@ -162,6 +163,14 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
         except:
             pass
 
+        # Get countries of origin
+        countries = []
+        try:
+            if hasattr(item, 'countries') and item.countries:
+                countries = [country.tag for country in item.countries]
+        except:
+            pass
+
         # Get resolution
         resolution = ""
         try:
@@ -189,8 +198,8 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute('''
-                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, countries, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 f"{item_type}_{item.key}_{chunk_idx}",
                 item.title,
@@ -205,6 +214,7 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
                 director,
                 json.dumps(genres),
                 resolution,
+                json.dumps(countries),
                 json.dumps(embedding)
             ))
             conn.commit()

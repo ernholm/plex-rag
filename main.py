@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.8"
+VERSION = "1.5.9"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -94,11 +94,51 @@ def get_all_metadata(conn):
 
     return all_actors, all_genres
 
+# Maps demonyms and country adjectives to Plex country names
+NATIONALITY_TO_COUNTRY = {
+    'korean': 'South Korea',
+    'japanese': 'Japan',
+    'chinese': 'China',
+    'french': 'France',
+    'german': 'Germany',
+    'italian': 'Italy',
+    'spanish': 'Spain',
+    'swedish': 'Sweden',
+    'danish': 'Denmark',
+    'norwegian': 'Norway',
+    'finnish': 'Finland',
+    'russian': 'Russia',
+    'indian': 'India',
+    'iranian': 'Iran',
+    'thai': 'Thailand',
+    'mexican': 'Mexico',
+    'brazilian': 'Brazil',
+    'argentinian': 'Argentina',
+    'australian': 'Australia',
+    'british': 'United Kingdom',
+    'english': 'United Kingdom',
+    'american': 'United States of America',
+    'canadian': 'Canada',
+    'hong kong': 'Hong Kong',
+    'taiwanese': 'Taiwan',
+    'turkish': 'Turkey',
+    'polish': 'Poland',
+    'romanian': 'Romania',
+    'greek': 'Greece',
+    'portuguese': 'Portugal',
+    'dutch': 'Netherlands',
+    'belgian': 'Belgium',
+    'austrian': 'Austria',
+    'swiss': 'Switzerland',
+    'israeli': 'Israel',
+}
+
 def extract_metadata_filters(query, all_actors, all_genres):
-    """Extract actor names and genres from query"""
+    """Extract actor names, genres and countries from query"""
     query_lower = query.lower()
     matched_actors = []
     matched_genres = []
+    matched_countries = []
 
     # Common multi-word phrases that shouldn't be matched as genres
     # These are semantic search concepts, not genre filters
@@ -155,13 +195,28 @@ def extract_metadata_filters(query, all_actors, all_genres):
             if found:
                 matched_genres.append(genre)
 
+    # Check for nationality/country words
+    query_words = query_lower.split()
+    for word in query_words:
+        if word in NATIONALITY_TO_COUNTRY:
+            country = NATIONALITY_TO_COUNTRY[word]
+            if country not in matched_countries:
+                matched_countries.append(country)
+    # Also check two-word phrases (e.g. "hong kong")
+    for i in range(len(query_words) - 1):
+        phrase = f"{query_words[i]} {query_words[i+1]}"
+        if phrase in NATIONALITY_TO_COUNTRY:
+            country = NATIONALITY_TO_COUNTRY[phrase]
+            if country not in matched_countries:
+                matched_countries.append(country)
+
     # Log what we found for debugging
-    print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}")
+    print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}, Countries: {matched_countries}")
     print(f"DEBUG: Query words (original): {query_words}")
     print(f"DEBUG: Query words (after phrase removal): {query_words_for_genres}")
     print(f"DEBUG: Available genres in database: {sorted(list(all_genres))[:30]}")
 
-    return matched_actors, matched_genres
+    return matched_actors, matched_genres, matched_countries
 
 init_db()
 
@@ -186,6 +241,7 @@ class SearchResult(BaseModel):
     director: Optional[str] = None
     genres: List[str] = []
     resolution: Optional[str] = None
+    countries: List[str] = []
 
 class IndexStatusResponse(BaseModel):
     total_items: int
@@ -205,19 +261,21 @@ async def search(query_data: SearchQuery):
 
         # Extract metadata filters from query
         all_actors, all_genres = get_all_metadata(conn)
-        matched_actors, matched_genres = extract_metadata_filters(query_data.query, all_actors, all_genres)
+        matched_actors, matched_genres, matched_countries = extract_metadata_filters(query_data.query, all_actors, all_genres)
 
-        # Strip matched actor names from query before embedding so semantic
-        # search focuses on concepts, not the actor name
+        # Strip matched actor names and nationality words from query before
+        # embedding so semantic search focuses on concepts
         semantic_query = query_data.query
         for actor in matched_actors:
             semantic_query = semantic_query.lower().replace(actor.lower(), "").strip()
+        for word, _ in NATIONALITY_TO_COUNTRY.items():
+            semantic_query = semantic_query.lower().replace(word, "").strip()
         semantic_query = semantic_query.strip() or query_data.query
 
         query_embedding = embedder.encode(semantic_query)
 
         c = conn.cursor()
-        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, embedding FROM embeddings')
+        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, countries, embedding FROM embeddings')
         rows = c.fetchall()
         conn.close()
 
@@ -228,12 +286,12 @@ async def search(query_data: SearchQuery):
         results = []
         for row in rows:
             try:
-                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, resolution, embedding_blob = row
+                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, resolution, countries_json, embedding_blob = row
 
-                # Deserialize embedding, actors, and genres
                 embedding = json.loads(embedding_blob)
                 actors = json.loads(actors_json) if actors_json else []
                 genres = json.loads(genres_json) if genres_json else []
+                countries = json.loads(countries_json) if countries_json else []
 
                 # Calculate similarity
                 similarity = cosine_similarity(query_embedding, embedding)
@@ -265,6 +323,11 @@ async def search(query_data: SearchQuery):
                     if matching_genres:
                         metadata_boost += min(0.20, 0.10 * len(matching_genres))
 
+                # Boost if result has matching country
+                if matched_countries and countries:
+                    if any(c.lower() == mc.lower() for c in countries for mc in matched_countries):
+                        metadata_boost += 0.20
+
                 similarity = min(0.99, similarity + metadata_boost)
 
                 results.append({
@@ -281,6 +344,7 @@ async def search(query_data: SearchQuery):
                     'director': director,
                     'genres': genres,
                     'resolution': resolution,
+                    'countries': countries,
                     'similarity': similarity
                 })
             except Exception as e:
@@ -306,25 +370,23 @@ async def search(query_data: SearchQuery):
         # Sort by similarity and take top N
         deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
 
-        # Apply strict filtering if enabled: only return results with matching actors/genres
-        if query_data.strict_filter and (matched_actors or matched_genres):
-            print(f"DEBUG: Strict filter enabled. Matched actors: {matched_actors}, Matched genres: {matched_genres}")
+        # Apply strict filtering if enabled
+        if query_data.strict_filter and (matched_actors or matched_genres or matched_countries):
+            print(f"DEBUG: Strict filter enabled. Actors: {matched_actors}, Genres: {matched_genres}, Countries: {matched_countries}")
             strict_filtered = []
             for result in deduped_results:
                 has_matching_actor = False
                 has_matching_genre = False
+                has_matching_country = False
 
-                # Check for matching actors
                 if matched_actors and result['actors']:
                     result_actors_lower = [a.lower() for a in result['actors']]
-                    # Check if any matched actor equals any result actor (case-insensitive)
                     has_matching_actor = any(
                         ma.lower() == actor_name
                         for ma in matched_actors
                         for actor_name in result_actors_lower
                     )
 
-                # Check for matching genres
                 if matched_genres and result['genres']:
                     result_genres_lower = [g.lower() for g in result['genres']]
                     has_matching_genre = any(
@@ -333,17 +395,24 @@ async def search(query_data: SearchQuery):
                         for genre_name in result_genres_lower
                     )
 
-                # Include result if it matches required filters
-                should_include = False
+                if matched_countries and result['countries']:
+                    result_countries_lower = [c.lower() for c in result['countries']]
+                    has_matching_country = any(
+                        mc.lower() == c
+                        for mc in matched_countries
+                        for c in result_countries_lower
+                    )
 
-                if matched_actors and matched_genres:
-                    should_include = has_matching_actor and has_matching_genre
-                elif matched_actors:
-                    should_include = has_matching_actor
-                elif matched_genres:
-                    should_include = has_matching_genre
+                # Build list of which filters were specified and which matched
+                required = []
+                if matched_actors:
+                    required.append(has_matching_actor)
+                if matched_genres:
+                    required.append(has_matching_genre)
+                if matched_countries:
+                    required.append(has_matching_country)
 
-                if should_include:
+                if all(required):
                     strict_filtered.append(result)
                     print(f"DEBUG: Included {result['title']}")
 
@@ -368,7 +437,8 @@ async def search(query_data: SearchQuery):
                 duration=r['duration'],
                 director=r['director'],
                 genres=r['genres'],
-                resolution=r['resolution']
+                resolution=r['resolution'],
+                countries=r['countries']
             )
             for r in top_results
         ]
@@ -409,7 +479,7 @@ async def debug_genres():
             "total_genres": len(all_genres),
             "genres": sorted(list(all_genres)),
             "total_actors": len(all_actors),
-            "sample_actors": sorted(list(all_actors))[:20]
+            "sample_actors": sorted(list(all_actors))[:20],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
