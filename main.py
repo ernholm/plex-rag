@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -329,16 +329,13 @@ async def search(query_data: SearchQuery):
                     )
 
                 # Include result if it matches required filters
-                # When both are mentioned: only strictly require actors (genres are used for ranking)
-                # When only actors: require actor match
-                # When only genres: require genre match
                 should_include = False
 
-                if matched_actors:
-                    # Actors are the primary filter - require actor match
+                if matched_actors and matched_genres:
+                    should_include = has_matching_actor and has_matching_genre
+                elif matched_actors:
                     should_include = has_matching_actor
                 elif matched_genres:
-                    # Only genres mentioned (no actors) - require genre match
                     should_include = has_matching_genre
 
                 if should_include:
