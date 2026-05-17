@@ -26,7 +26,7 @@
         header {
             text-align: center;
             color: white;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             padding-top: 20px;
         }
 
@@ -44,33 +44,80 @@
         .search-section {
             background: white;
             border-radius: 12px;
-            padding: 30px;
+            padding: 24px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
             margin-bottom: 30px;
         }
 
-        .search-box {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+        .search-input-wrap {
+            margin-bottom: 14px;
         }
 
-        input[type="text"] {
-            flex: 1;
-            padding: 12px 16px;
+        #queryInput {
+            width: 100%;
+            padding: 16px 20px;
             border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1rem;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-family: inherit;
             transition: border-color 0.3s;
+            resize: none;
+            line-height: 1.5;
         }
 
-        input[type="text"]:focus {
+        #queryInput:focus {
             outline: none;
             border-color: #667eea;
         }
 
-        button {
-            padding: 12px 24px;
+        .search-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .search-controls-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        select {
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            background: white;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .strict-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #555;
+            font-size: 0.9rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .strict-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .btn-search {
+            padding: 12px 32px;
             background: #667eea;
             color: white;
             border: none;
@@ -78,25 +125,53 @@
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s, transform 0.1s;
+            transition: background 0.2s, transform 0.1s;
+            white-space: nowrap;
         }
 
-        button:hover {
+        .btn-search:hover {
             background: #5568d3;
         }
 
-        button:active {
+        .btn-search:active {
             transform: scale(0.98);
         }
 
-        button:disabled {
+        .btn-search:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
 
-        .status {
-            font-size: 0.9rem;
+        .search-secondary {
+            margin-top: 10px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .btn-rebuild {
+            background: none;
+            border: 1px solid #ddd;
+            color: #999;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .btn-rebuild:hover {
             color: #666;
+            border-color: #bbb;
+        }
+
+        .btn-rebuild:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            font-size: 0.85rem;
+            color: #888;
             margin-top: 10px;
         }
 
@@ -114,8 +189,7 @@
         }
 
         .results-header h2 {
-            font-size: 1.5rem;
-            margin-bottom: 5px;
+            font-size: 1.4rem;
         }
 
         .results-grid {
@@ -227,6 +301,10 @@
             color: #666;
         }
 
+        .load-more-sentinel {
+            height: 60px;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -245,11 +323,11 @@
 
         .modal-content {
             background: white;
-            margin: 10% auto;
+            margin: 5% auto;
             padding: 30px;
             border-radius: 12px;
             max-width: 600px;
-            max-height: 80vh;
+            max-height: 85vh;
             overflow-y: auto;
             animation: slideIn 0.3s;
             position: relative;
@@ -261,7 +339,7 @@
         }
 
         @keyframes slideIn {
-            from { transform: translateY(-50px); opacity: 0; }
+            from { transform: translateY(-30px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
 
@@ -290,6 +368,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .modal-close:hover {
@@ -316,9 +395,10 @@
 
         .modal-meta {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .modal-badge {
@@ -343,7 +423,7 @@
             word-wrap: break-word;
         }
 
-.modal-section-title {
+        .modal-section-title {
             font-weight: 600;
             color: #333;
             margin-top: 20px;
@@ -408,7 +488,6 @@
             border-radius: 6px;
             font-size: 0.9rem;
             font-weight: 600;
-            margin-right: 10px;
         }
 
         .rating-badge {
@@ -419,7 +498,6 @@
             border-radius: 6px;
             font-size: 0.9rem;
             font-weight: 600;
-            margin-right: 10px;
         }
 
         .loading {
@@ -435,13 +513,8 @@
             animation: pulse 1.5s infinite;
         }
 
-        .loading span:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-
-        .loading span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
+        .loading span:nth-child(2) { animation-delay: 0.2s; }
+        .loading span:nth-child(3) { animation-delay: 0.4s; }
 
         @keyframes pulse {
             0%, 100% { opacity: 0.5; }
@@ -453,12 +526,47 @@
             color: #c33;
             padding: 15px;
             border-radius: 8px;
-            margin-top: 15px;
+            margin-top: 10px;
             display: none;
         }
 
         .error.active {
             display: block;
+        }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+
+            header { margin-bottom: 20px; padding-top: 10px; }
+            header h1 { font-size: 1.8rem; }
+            header p { font-size: 0.95rem; }
+
+            .search-section { padding: 16px; }
+
+            .search-controls { flex-direction: column; align-items: stretch; }
+            .search-controls-left { justify-content: space-between; }
+            .btn-search { width: 100%; padding: 14px; font-size: 1.05rem; }
+
+            .results-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+
+            .modal-content {
+                margin: 0;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                max-height: 92vh;
+                border-radius: 16px 16px 0 0;
+                animation: slideUp 0.3s;
+            }
+
+            @keyframes slideUp {
+                from { transform: translateY(100%); }
+                to { transform: translateY(0); }
+            }
+
+            .modal-details { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -466,38 +574,36 @@
     <div class="container">
         <header>
             <h1>📺 Plex RAG Search</h1>
-            <p>Ask natural questions about your Plex library</p>
+            <p>Natural Search for Plex Library</p>
             <p style="font-size: 0.8rem; opacity: 0.7; margin-top: 5px;">Version: <span id="versionDisplay">loading...</span></p>
         </header>
 
         <div class="search-section">
-            <div class="search-box">
+            <div class="search-input-wrap">
                 <input
                     type="text"
                     id="queryInput"
-                    placeholder="e.g., 'movies with supernatural monsters' or 'comedies from the 80s'"
-                    autocomplete="off"
+                    placeholder="Try: 'Korean thrillers', 'Bruce Willis sci-fi', 'movies about grief and loss', 'funny 80s comedies'…"
                 >
-                <select id="limitSelect" style="padding: 12px 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" title="Maximum results to show">
-                    <option value="12">12 Results</option>
-                    <option value="25">25 Results</option>
-                    <option value="50">50 Results</option>
-                    <option value="100">100 Results</option>
-                </select>
-                <select id="thresholdSelect" style="padding: 12px 8px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;" title="Minimum match quality">
-                    <option value="0.20">20% Quality</option>
-                    <option value="0.30" selected>30% Quality</option>
-                    <option value="0.40">40% Quality</option>
-                    <option value="0.50">50% Quality</option>
-                    <option value="0.60">60% Quality</option>
-                </select>
-                <button onclick="performSearch()">Search</button>
-                <button onclick="rebuildIndex()" style="background: #764ba2;">⟳ Rebuild</button>
             </div>
-            <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px; color: #333; font-size: 0.9rem;">
-                <input type="checkbox" id="strictFilter" style="width: 18px; height: 18px; cursor: pointer;">
-                <span>Strict Filtering (require mentioned actors/genres)</span>
-            </label>
+            <div class="search-controls">
+                <div class="search-controls-left">
+                    <select id="thresholdSelect" title="Minimum match quality">
+                        <option value="0.20">20% min quality</option>
+                        <option value="0.30" selected>30% min quality</option>
+                        <option value="0.40">40% min quality</option>
+                        <option value="0.50">50% min quality</option>
+                    </select>
+                    <label class="strict-label">
+                        <input type="checkbox" id="strictFilter">
+                        <span>Strict filter</span>
+                    </label>
+                </div>
+                <button class="btn-search" onclick="performSearch()">Search</button>
+            </div>
+            <div class="search-secondary">
+                <button class="btn-rebuild" onclick="rebuildIndex()">↻ Rebuild index</button>
+            </div>
             <div class="status" id="status">Ready to search</div>
             <div class="error" id="error"></div>
         </div>
@@ -507,6 +613,7 @@
                 <h2 id="resultsTitle">Results</h2>
             </div>
             <div class="results-grid" id="resultsGrid"></div>
+            <div class="load-more-sentinel" id="loadMoreSentinel"></div>
         </div>
 
         <div class="no-results" id="noResults" style="display: none;">
@@ -543,7 +650,11 @@
         const errorDiv = document.getElementById('error');
         const resultsTitle = document.getElementById('resultsTitle');
 
-        // Allow Enter key to search
+        let allResults = [];
+        let displayedCount = 0;
+        const PAGE_SIZE = 12;
+        let scrollObserver = null;
+
         queryInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') performSearch();
         });
@@ -555,7 +666,6 @@
                 return;
             }
 
-            const limit = parseInt(document.getElementById('limitSelect').value);
             const threshold = parseFloat(document.getElementById('thresholdSelect').value);
             const strictFilter = document.getElementById('strictFilter').checked;
 
@@ -567,20 +677,16 @@
             try {
                 const response = await fetch('/search', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         query: query,
-                        limit: limit,
+                        limit: 50,
                         min_relevance: threshold,
                         strict_filter: strictFilter
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
 
                 const results = await response.json();
                 displayResults(results, query);
@@ -593,6 +699,10 @@
         }
 
         function displayResults(results, query) {
+            allResults = results;
+            displayedCount = 0;
+            resultsGrid.innerHTML = '';
+
             if (results.length === 0) {
                 noResults.style.display = 'block';
                 statusDiv.textContent = `No results found for "${query}"`;
@@ -600,27 +710,42 @@
             }
 
             resultsTitle.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''} for "${query}"`;
-            resultsGrid.innerHTML = '';
-
-            results.forEach(result => {
-                const card = createResultCard(result);
-                resultsGrid.appendChild(card);
-            });
-
             resultsSection.classList.add('active');
-            statusDiv.textContent = `Showing ${results.length} result${results.length !== 1 ? 's' : ''}`;
+            statusDiv.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''}`;
+
+            appendNextPage();
+            setupScrollObserver();
+        }
+
+        function appendNextPage() {
+            const batch = allResults.slice(displayedCount, displayedCount + PAGE_SIZE);
+            batch.forEach(result => resultsGrid.appendChild(createResultCard(result)));
+            displayedCount += batch.length;
+            if (displayedCount >= allResults.length && scrollObserver) {
+                scrollObserver.disconnect();
+            }
+        }
+
+        function setupScrollObserver() {
+            if (scrollObserver) scrollObserver.disconnect();
+            const sentinel = document.getElementById('loadMoreSentinel');
+            scrollObserver = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && displayedCount < allResults.length) {
+                    appendNextPage();
+                }
+            }, { rootMargin: '200px' });
+            scrollObserver.observe(sentinel);
         }
 
         function createResultCard(result) {
             const card = document.createElement('div');
             card.className = 'result-card';
-
             const relevancePercent = Math.round(result.relevance * 100);
             const typeLabel = result.type === 'tv_show' ? 'TV Show' : 'Movie';
 
             card.innerHTML = `
                 <div class="result-poster">
-                    ${result.poster_url ? `<img src="${result.poster_url}" alt="${result.title}">` : '🎬'}
+                    ${result.poster_url ? `<img src="${result.poster_url}" alt="${escapeHtml(result.title)}" loading="lazy">` : '🎬'}
                 </div>
                 <div class="result-content">
                     <div class="result-title">${escapeHtml(result.title)}</div>
@@ -648,23 +773,17 @@
             document.getElementById('modalRelevance').textContent = `Match: ${relevancePercent}%`;
 
             const resolutionDiv = document.getElementById('modalResolution');
-            if (result.resolution) {
-                resolutionDiv.innerHTML = `<span class="resolution-badge">${escapeHtml(result.resolution)}</span>`;
-            } else {
-                resolutionDiv.innerHTML = '';
-            }
+            resolutionDiv.innerHTML = result.resolution
+                ? `<span class="resolution-badge">${escapeHtml(result.resolution)}</span>`
+                : '';
+
+            const ratingDiv = document.getElementById('modalRating');
+            ratingDiv.innerHTML = result.rating
+                ? `<span class="rating-badge">★ ${result.rating.toFixed(1)}</span>`
+                : '';
 
             document.getElementById('modalDescription').textContent = result.description;
 
-            // Display rating
-            const ratingDiv = document.getElementById('modalRating');
-            if (result.rating) {
-                ratingDiv.innerHTML = `<span class="rating-badge">★ ${result.rating.toFixed(1)}</span>`;
-            } else {
-                ratingDiv.innerHTML = '';
-            }
-
-            // Display details (year, duration, director)
             const detailsDiv = document.getElementById('modalDetails');
             let detailsHTML = '';
             if (result.year) {
@@ -673,50 +792,36 @@
             if (result.duration) {
                 const hours = Math.floor(result.duration / 60);
                 const minutes = result.duration % 60;
-                let durationStr = '';
-                if (hours > 0) durationStr += `${hours}h `;
-                if (minutes > 0) durationStr += `${minutes}m`;
-                detailsHTML += `<div class="detail-item"><div class="detail-label">Duration</div><div class="detail-value">${durationStr}</div></div>`;
+                let dur = '';
+                if (hours > 0) dur += `${hours}h `;
+                if (minutes > 0) dur += `${minutes}m`;
+                detailsHTML += `<div class="detail-item"><div class="detail-label">Duration</div><div class="detail-value">${dur}</div></div>`;
             }
             if (result.director) {
                 detailsHTML += `<div class="detail-item"><div class="detail-label">Director</div><div class="detail-value">${escapeHtml(result.director)}</div></div>`;
             }
             detailsDiv.innerHTML = detailsHTML;
 
-            // Display genres
             const genresSection = document.getElementById('modalGenresSection');
             if (result.genres && result.genres.length > 0) {
-                const genreTags = result.genres
-                    .map(genre => `<span class="genre-tag">${escapeHtml(genre)}</span>`)
-                    .join('');
-                genresSection.innerHTML = `
-                    <div class="modal-section-title">Genres</div>
-                    <div>${genreTags}</div>
-                `;
+                const genreTags = result.genres.map(g => `<span class="genre-tag">${escapeHtml(g)}</span>`).join('');
+                genresSection.innerHTML = `<div class="modal-section-title">Genres</div><div>${genreTags}</div>`;
             } else {
                 genresSection.innerHTML = '';
             }
 
-            // Display actors
             const actorsSection = document.getElementById('modalActorsSection');
             if (result.actors && result.actors.length > 0) {
-                const actorTags = result.actors
-                    .map(actor => `<span class="actor-tag">${escapeHtml(actor)}</span>`)
-                    .join('');
-                actorsSection.innerHTML = `
-                    <div class="modal-section-title">Cast</div>
-                    <div class="modal-actors">${actorTags}</div>
-                `;
+                const actorTags = result.actors.map(a => `<span class="actor-tag">${escapeHtml(a)}</span>`).join('');
+                actorsSection.innerHTML = `<div class="modal-section-title">Cast</div><div class="modal-actors">${actorTags}</div>`;
             } else {
                 actorsSection.innerHTML = '';
             }
 
             const posterDiv = document.getElementById('modalPoster');
-            if (result.poster_url) {
-                posterDiv.innerHTML = `<img src="${result.poster_url}" alt="${result.title}">`;
-            } else {
-                posterDiv.textContent = '🎬';
-            }
+            posterDiv.innerHTML = result.poster_url
+                ? `<img src="${result.poster_url}" alt="${escapeHtml(result.title)}">`
+                : '🎬';
 
             modal.classList.add('active');
         }
@@ -725,25 +830,21 @@
             document.getElementById('detailModal').classList.remove('active');
         }
 
-        // Close modal when clicking outside of it
         window.onclick = function(event) {
             const modal = document.getElementById('detailModal');
-            if (event.target == modal) {
-                modal.classList.remove('active');
-            }
-        }
+            if (event.target === modal) modal.classList.remove('active');
+        };
 
         function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = text;
+            div.textContent = text || '';
             return div.innerHTML;
         }
 
-        // Rebuild index
         async function rebuildIndex() {
             const btn = event.target;
             btn.disabled = true;
-            btn.textContent = '⟳ Rebuilding...';
+            btn.textContent = '↻ Rebuilding…';
             statusDiv.innerHTML = '<div class="loading"><span>●</span><span>●</span><span>●</span></div>';
             errorDiv.classList.remove('active');
 
@@ -751,40 +852,35 @@
                 const response = await fetch('/rebuild-index', { method: 'POST' });
                 const data = await response.json();
                 statusDiv.textContent = `✓ Index rebuilt: ${data.items_indexed} chunks indexed`;
-                btn.textContent = '⟳ Rebuild';
-                btn.disabled = false;
-                checkStatus(); // Refresh full status
             } catch (error) {
                 errorDiv.textContent = `Rebuild error: ${error.message}`;
                 errorDiv.classList.add('active');
                 statusDiv.textContent = 'Rebuild failed';
-                btn.textContent = '⟳ Rebuild';
+            } finally {
+                btn.textContent = '↻ Rebuild index';
                 btn.disabled = false;
+                checkStatus();
             }
         }
 
-        // Check API status on load
         async function checkStatus() {
             try {
                 const response = await fetch('/index-status');
                 const data = await response.json();
-                if (data.total_items > 0) {
-                    statusDiv.textContent = `Index ready: ${data.total_items} items indexed`;
-                } else {
-                    statusDiv.textContent = '⚠️ Index is empty. Click "Rebuild" to populate.';
-                }
-            } catch (error) {
+                statusDiv.textContent = data.total_items > 0
+                    ? `Index ready: ${data.total_items} items indexed`
+                    : '⚠️ Index is empty. Click "Rebuild index" to populate.';
+            } catch {
                 statusDiv.textContent = 'Unable to connect to API';
             }
         }
 
-        // Get version number
         async function loadVersion() {
             try {
                 const response = await fetch('/health');
                 const data = await response.json();
                 document.getElementById('versionDisplay').textContent = data.version || 'unknown';
-            } catch (error) {
+            } catch {
                 document.getElementById('versionDisplay').textContent = 'unknown';
             }
         }
