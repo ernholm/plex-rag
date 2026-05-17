@@ -7,16 +7,23 @@ import sqlite3
 import json
 import os
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.2"
+VERSION = "1.5.3"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(f"Plex RAG Search v{VERSION} starting up")
+    yield
 
 # Initialize FastAPI app
-app = FastAPI(title="Plex RAG Search")
+app = FastAPI(title="Plex RAG Search", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
