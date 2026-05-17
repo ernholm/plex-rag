@@ -190,6 +190,18 @@
             font-weight: 600;
         }
 
+        .result-rating {
+            display: inline-block;
+            font-size: 0.8rem;
+            background: #fff8e1;
+            color: #b8860b;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            margin-left: 4px;
+        }
+
         .result-relevance {
             font-size: 0.9rem;
             color: #667eea;
@@ -331,14 +343,7 @@
             word-wrap: break-word;
         }
 
-        .modal-rating {
-            font-size: 1.2rem;
-            color: #ffc107;
-            font-weight: 600;
-            margin-bottom: 15px;
-        }
-
-        .modal-section-title {
+.modal-section-title {
             font-weight: 600;
             color: #333;
             margin-top: 20px;
@@ -399,6 +404,17 @@
             display: inline-block;
             background: #fff3cd;
             color: #856404;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .rating-badge {
+            display: inline-block;
+            background: #fff8e1;
+            color: #b8860b;
             padding: 6px 12px;
             border-radius: 6px;
             font-size: 0.9rem;
@@ -508,8 +524,8 @@
                     <span class="modal-badge" id="modalType"></span>
                     <span class="modal-badge modal-relevance" id="modalRelevance"></span>
                     <span id="modalResolution"></span>
+                    <span id="modalRating"></span>
                 </div>
-                <div class="modal-rating" id="modalRating"></div>
                 <div class="modal-details" id="modalDetails"></div>
                 <div class="modal-description" id="modalDescription"></div>
                 <div id="modalGenresSection"></div>
@@ -611,6 +627,7 @@
                     <div>
                         <span class="result-type">${typeLabel}</span>
                         ${result.resolution ? `<span class="result-resolution">${escapeHtml(result.resolution)}</span>` : ''}
+                        ${result.rating ? `<span class="result-rating">★ ${result.rating.toFixed(1)}</span>` : ''}
                     </div>
                     <div class="result-relevance">Match: ${relevancePercent}%</div>
                     <div class="result-description">${escapeHtml(result.description)}</div>
@@ -642,9 +659,9 @@
             // Display rating
             const ratingDiv = document.getElementById('modalRating');
             if (result.rating) {
-                ratingDiv.innerHTML = `★ ${result.rating.toFixed(1)}/10`;
+                ratingDiv.innerHTML = `<span class="rating-badge">★ ${result.rating.toFixed(1)}</span>`;
             } else {
-                ratingDiv.textContent = '';
+                ratingDiv.innerHTML = '';
             }
 
             // Display details (year, duration, director)

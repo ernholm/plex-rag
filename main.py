@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.7"
+VERSION = "1.5.8"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
