@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"REMINDER: Before pushing, check if README.md needs updating to reflect any new features, changed behaviour, or removed options.\"}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

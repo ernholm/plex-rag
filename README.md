@@ -1,44 +1,37 @@
 # Plex RAG Search
 
-A semantic search service for your Plex library using RAG (Retrieval-Augmented Generation) and AI embeddings. Ask natural questions about your media and get smart results.
+A semantic search service for your Plex library. Ask natural questions about your media and get smart results based on meaning, not just keywords.
 
 ## Features
 
-- **Semantic Search**: Ask questions like "movies with supernatural monsters" and find content matching the intent (e.g., werewolves) even if not in the title
-- **Metadata Filtering**: Search by actor name or genre and get boosted results - "Bruce Willis sci-fi" will prioritize films with Bruce Willis in sci-fi genre
-- **Rich Metadata Display**: View year, duration, director, genres, resolution (4K/1080p/720p/SD), rating, and cast
-- **Title Match Boosting**: Direct title matches get ranked higher in results
-- **Configurable Libraries**: Index specific Plex sections via `PLEX_SECTIONS` env var
-- **Smart Deduplication**: Same movie only appears once per search with highest relevance score
-- **Adjustable Results**: Choose 12, 25, 50, or 100 results per search
-- **Modal Details View**: Click any result to see full details including poster, description, and cast
-- **Proper Aspect Ratios**: Movie posters display in correct portrait/landscape proportions
-- **Parallel Indexing**: 4x faster indexing with concurrent processing
-- **Web UI**: Clean, modern interface for searching your library
-- **Docker Ready**: Easy deployment in your homelab
+- **Semantic Search**: "movies about grief and loss" finds relevant films even if those words aren't in the title
+- **Actor & Genre Filtering**: "Bruce Willis sci-fi" boosts films with Bruce Willis in sci-fi genre; enable Strict Filter to require exact matches
+- **Country/Nationality Filtering**: "Korean thrillers" or "Japanese horror" boosts and filters by country of origin — works for 35+ nationalities
+- **Smart Query Parsing**: Actor names and nationality words are stripped before embedding so the semantic search focuses on the concept, not the name
+- **Rich Metadata**: Year, duration, director, genres, resolution (4K/1080p/720p/SD), audience rating, and cast (up to 10 actors)
+- **Infinite Scroll**: Starts with 12 results, loads more as you scroll — fetches up to 50 total per query
+- **Strict Filter**: Checkbox to require all mentioned actors, genres, and countries to be present
+- **Mobile-Friendly**: Responsive layout, modal slides up from bottom on iPhone/Android
+- **Parallel Indexing**: 4 concurrent workers for fast library indexing
+- **Docker Ready**: Easy homelab deployment with persistent storage
 
 ## Quick Start
 
 ### 1. Get Your Plex Token
 
-1. Go to Plex Settings → Remote Access → Get Token
-2. Copy your token (looks like `xxxxxxxxxxxxxxxxxxxx`)
+Go to Plex Settings → Remote Access → Get Token and copy your token.
 
 ### 2. Setup
 
 ```bash
-# Clone/download the project
+git clone https://github.com/ernholm/plex-rag.git
 cd plex-rag
 
-# Create .env file
 cp .env.example .env
-
 # Edit .env with your Plex details
-nano .env
 ```
 
-Set these values in `.env`:
-```
+```env
 PLEX_URL=http://your-plex-ip:32400
 PLEX_TOKEN=your_token_here
 PLEX_SECTIONS=Movies,TV Shows
@@ -50,38 +43,35 @@ PLEX_SECTIONS=Movies,TV Shows
 docker-compose up --build
 ```
 
-The service will be available at `http://localhost:8000`
+Service available at `http://localhost:8000`
 
 ### 4. Index Your Library
 
-Open the web UI - you'll see a status and a purple "⟳ Rebuild" button. Click it to start indexing your library. Progress will display in the status.
+Click **↻ Rebuild index** in the web UI, or via API:
 
-Or use the API:
 ```bash
 curl -X POST http://localhost:8000/rebuild-index
 ```
+
+Indexing takes a few minutes — it reloads full metadata per item from Plex to get the complete cast, country, and rating data.
 
 ## Usage
 
 ### Web UI
 
 1. Open `http://localhost:8000`
-2. Select number of results (12, 25, 50, or 100)
-3. Type a natural language query:
-   - "horror movies with zombies"
-   - "Bruce Willis time travel sci-fi"
-   - "comedies from the 90s"
-   - "supernatural monsters like werewolves"
-   - "4K action movies"
-4. Results show matching content with relevance scores, resolution badges, and type labels
-5. Click any result card to see full details in a modal view including:
-   - Poster image
-   - Title, type, and match percentage
-   - Rating and resolution
-   - Year, duration, and director
-   - Genres
-   - Cast (top 5 actors)
-   - Full description
+2. Type a natural language query and press **Enter** or click **Search**:
+   - `horror movies with zombies`
+   - `Bruce Willis time travel` — strips "Bruce Willis" before semantic search, boosts his films
+   - `Korean thrillers` — strips "Korean" before semantic search, boosts South Korean films
+   - `funny 80s comedies`
+   - `movies about friendship and loss`
+3. Results load 12 at a time; scroll down to load more
+4. Click any result for full details: poster, rating, duration, director, genres, cast
+
+**Strict Filter** checkbox: when enabled, only results matching *all* mentioned actors, genres, and countries are shown. Useful for "Bruce Willis science fiction" to exclude non-sci-fi Bruce Willis films.
+
+**Min quality** dropdown: filters out low-confidence matches (default 30%).
 
 ### API
 
@@ -89,7 +79,7 @@ curl -X POST http://localhost:8000/rebuild-index
 ```bash
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
-  -d '{"query": "movies with supernatural monsters", "limit": 25}'
+  -d '{"query": "Korean crime thriller", "limit": 50, "min_relevance": 0.3, "strict_filter": false}'
 ```
 
 **Index Status**
@@ -97,11 +87,14 @@ curl -X POST http://localhost:8000/search \
 curl http://localhost:8000/index-status
 ```
 
-Returns: `"indexed - 3300 chunks from 2500 items"`
-
 **Rebuild Index**
 ```bash
 curl -X POST http://localhost:8000/rebuild-index
+```
+
+**Health / Version**
+```bash
+curl http://localhost:8000/health
 ```
 
 ## Configuration
@@ -109,126 +102,77 @@ curl -X POST http://localhost:8000/rebuild-index
 ### Environment Variables
 
 ```env
-# Plex Server
 PLEX_URL=http://192.168.1.100:32400
 PLEX_TOKEN=your_plex_token
 
-# Which Plex libraries to index (comma-separated)
-# Leave empty to use default: Movies,TV Shows
-PLEX_SECTIONS=Movies,TV Shows,4K Movies
-```
-
-### Library Selection Examples
-
-```env
-# Default (Movies and TV Shows)
+# Comma-separated Plex library section names to index
 PLEX_SECTIONS=Movies,TV Shows
-
-# Multiple users
-PLEX_SECTIONS=Movies,TV Shows,John's Movies,John's TV Shows
-
-# 4K content only
-PLEX_SECTIONS=4K Movies,4K TV Shows
-
-# Single library
-PLEX_SECTIONS=Movies
 ```
 
 ## Architecture
 
-- **FastAPI Backend**: RESTful API for search and indexing
-- **SQLite Database**: Stores embeddings and metadata locally
-- **Sentence Transformers**: AI embeddings (all-MiniLM-L6-v2 model)
-- **PlexAPI**: Plex library metadata integration
-- **Frontend**: Vanilla JavaScript web UI with responsive design
-- **Docker**: Containerized deployment
+| Component | Technology |
+|---|---|
+| Backend | FastAPI (Python) |
+| Embeddings | Sentence Transformers `all-MiniLM-L6-v2` |
+| Database | SQLite (embeddings + metadata) |
+| Plex integration | PlexAPI |
+| Frontend | Vanilla JS, no frameworks |
+| Deployment | Docker + named volume |
 
 ## How It Works
 
 ### Indexing
 
-1. **Fetch**: Retrieves all items from configured Plex libraries
-2. **Chunk**: Splits descriptions into overlapping chunks (300 words with 50-word overlap)
-3. **Extract Metadata**: Pulls year, duration, director, genres, resolution, rating, cast
-4. **Embed**: Converts each chunk to a semantic vector using Sentence Transformers
-5. **Store**: Saves embeddings and metadata to SQLite database
-6. **Deduplicate**: Same item only stored once with best metadata match
+1. Fetch all items from configured Plex libraries
+2. Call `item.reload()` per item to get full metadata (cast, countries, rating)
+3. Chunk descriptions into overlapping 300-word segments
+4. Embed each chunk with Sentence Transformers
+5. Normalize non-English genre names to English equivalents (e.g. Dokumentär → Documentary)
+6. Store embeddings + metadata (title, year, duration, director, genres, resolution, countries, rating, cast) in SQLite
 
 ### Searching
 
-1. **Query Embedding**: Your query is converted to a semantic vector
-2. **Metadata Extraction**: Query is parsed for actor names and genres
-3. **Vector Search**: Finds most similar chunks in the database
-4. **Boosting**: Results boosted by:
-   - Title matches (+30%)
-   - Actor mentions (+15% per match)
-   - Genre matches (+10% per genre, max +20%)
-5. **Deduplication**: Same movie appears only once with highest score
-6. **Ranking**: Results sorted by final relevance score (0-1)
-7. **Return**: Top N results with all metadata
+1. Parse query for actor names, genre names, and nationality words
+2. Strip actor names and nationality words from the query before embedding — semantic search focuses on the concept
+3. Embed the cleaned query
+4. Score all chunks by cosine similarity
+5. Apply metadata boosts:
+   - Title match: up to +30%
+   - Actor match: +8% per actor (max +10%)
+   - Genre match: +10% per genre (max +20%)
+   - Country match: +20%
+6. Deduplicate by Plex key (keep highest-scoring chunk per item)
+7. Apply Strict Filter if enabled (require all matched actors/genres/countries)
+8. Return top results sorted by score
+
+### Supported Nationalities
+
+Korean, Japanese, Chinese, French, German, Italian, Spanish, Swedish, Danish, Norwegian, Finnish, Russian, Indian, Iranian, Thai, Mexican, Brazilian, Australian, British, American, Canadian, Hong Kong, Taiwanese, Turkish, Polish, Romanian, Greek, Portuguese, Dutch, Belgian, Austrian, Swiss, Israeli, and more.
 
 ## Performance
 
-- **Indexing**: ~2500 movies in 8-10 minutes with 4 concurrent workers
-- **Searches**: Typically <100ms response time
+- **Indexing**: ~2500 movies in 8–10 minutes with 4 concurrent workers
+- **Search**: <100ms per query
 - **Storage**: ~100MB for 2500 movies with embeddings
-- **Data Persistence**: Embeddings persist in named Docker volume
 
 ## Troubleshooting
 
 **"Cannot connect to Plex"**
-- Verify `PLEX_URL` points to your Plex server
-- Confirm `PLEX_TOKEN` is valid (get fresh token from Plex settings)
-- Ensure Plex is running and accessible from the container
-- On Linux, use actual IP instead of localhost: `PLEX_URL=http://192.168.x.x:32400`
+- Verify `PLEX_URL` is correct and Plex is running
+- Check `PLEX_TOKEN` is valid
+- On Linux, use actual IP instead of `localhost`
 
 **"Index is empty"**
-- Click the purple "⟳ Rebuild" button in the web UI
-- Or run: `docker exec plex-rag-search python indexer.py`
+- Click **↻ Rebuild index** in the web UI
 - Check logs: `docker logs plex-rag-search`
 
-**"Indexing is slow or timing out"**
-- Increase timeout or reduce concurrent workers if Plex server is slow
-- Edit `indexer.py` to adjust `MAX_WORKERS` (default: 4)
-- Check Plex server performance with `docker logs plex-rag-search`
+**Ratings show as blank**
+- Rebuild the index — ratings use `audienceRating` from Plex which requires full metadata
 
-**"Searches return wrong results"**
-- Rebuild index to ensure fresh embeddings: click "⟳ Rebuild"
-- Try more specific queries with actor names or genres
-- Increase result limit to 50 or 100 to see more options
+**Only 3 actors showing**
+- Rebuild the index — the current indexer calls `item.reload()` to fetch the full cast (up to 10 actors)
 
-**"Posters not loading"**
-- Ensure Plex token is valid
-- Check that `PLEX_URL` is accessible and includes proper protocol
-- Verify poster URLs in database: `sqlite3 plex_embeddings.db "SELECT poster_url FROM embeddings LIMIT 1;"`
-
-## Development
-
-To run locally without Docker:
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure .env
-cp .env.example .env
-# Edit .env with your Plex details
-
-# Index your library
-python indexer.py
-
-# Start the server
-python main.py
-```
-
-Server will run on `http://localhost:8000`
-
-## Future Enhancements
-
-- Advanced filtering (by year, rating range, duration)
-- Watch history integration
-- Personalized recommendations based on watch history
-- Real-time library updates (incremental indexing)
-- Custom embedding models for better accuracy
-- Analytics dashboard (top genres, most-watched actors, etc.)
-- Multi-user support with per-user search history
+**Strict filter returns no results**
+- The mentioned actor, genre, or country must be present in the indexed metadata
+- Try without strict filter first to verify the data is there
