@@ -7,6 +7,8 @@ import sqlite3
 import json
 import os
 import logging
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
@@ -15,7 +17,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.11"
+VERSION = "1.5.12"
+
+# Indexing state — updated by background thread, read by /index-progress
+indexing_state = {
+    "running": False,
+    "items_done": 0,
+    "items_total": 0,
+    "error": None,
+}
+_index_executor = ThreadPoolExecutor(max_workers=1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -500,18 +511,34 @@ async def debug_actors():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
 
+@app.get("/index-progress")
+async def index_progress():
+    return indexing_state
+
 @app.post("/rebuild-index")
 async def rebuild_index():
-    """Trigger a rebuild of the index from Plex"""
-    try:
-        from indexer import index_plex_library
-        count = index_plex_library(embedder)
-        return {
-            "status": "indexed",
-            "items_indexed": count
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Indexing error: {str(e)}")
+    """Start a background index rebuild — returns immediately"""
+    if indexing_state["running"]:
+        return {"status": "already_running"}
+
+    def _progress(done: int, total: int):
+        indexing_state["items_done"] = done
+        indexing_state["items_total"] = total
+
+    def _run():
+        indexing_state.update({"running": True, "items_done": 0, "items_total": 0, "error": None})
+        try:
+            from indexer import index_plex_library
+            index_plex_library(embedder, progress_callback=_progress)
+        except Exception as e:
+            indexing_state["error"] = str(e)
+            logger.error(f"Indexing error: {e}")
+        finally:
+            indexing_state["running"] = False
+
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(_index_executor, _run)
+    return {"status": "started"}
 
 # Serve static frontend
 static_dir = Path("./static")

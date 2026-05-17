@@ -47,10 +47,15 @@ Service available at `http://localhost:8000`
 
 ### 4. Index Your Library
 
-Click **↻ Rebuild index** in the web UI, or via API:
+Click **↻ Rebuild index** in the web UI. Indexing runs in the background — a progress bar shows how many items have been processed. The service remains searchable while indexing runs.
+
+Or trigger via API (returns immediately, runs in background):
 
 ```bash
 curl -X POST http://localhost:8000/rebuild-index
+
+# Check progress
+curl http://localhost:8000/index-progress
 ```
 
 Indexing takes a few minutes — it reloads full metadata per item from Plex to get the complete cast, country, and rating data.

@@ -227,7 +227,7 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
 
     return indexed_count
 
-def index_plex_library(embedder):
+def index_plex_library(embedder, progress_callback=None):
     """
     Index all configured Plex library sections
     Returns count of indexed items
@@ -280,12 +280,15 @@ def index_plex_library(embedder):
                 ]
 
                 completed = 0
+                total = len(items)
                 for future in as_completed(futures):
                     try:
                         indexed_count += future.result()
                         completed += 1
+                        if progress_callback:
+                            progress_callback(completed, total)
                         if completed % 10 == 0:
-                            logger.info(f"Progress: {completed}/{len(items)} items processed")
+                            logger.info(f"Progress: {completed}/{total} items processed")
                     except Exception as e:
                         logger.error(f"Error in parallel task: {e}")
 

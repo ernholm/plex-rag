@@ -534,6 +534,37 @@
             display: block;
         }
 
+        .index-progress {
+            margin-top: 10px;
+            display: none;
+        }
+
+        .index-progress.active {
+            display: block;
+        }
+
+        .progress-bar-wrap {
+            background: #e9ecef;
+            border-radius: 6px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 6px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+
+        .progress-label {
+            font-size: 0.82rem;
+            color: #667eea;
+            font-weight: 600;
+        }
+
         /* Mobile */
         @media (max-width: 600px) {
             body { padding: 12px; }
@@ -605,6 +636,12 @@
                 <button class="btn-rebuild" onclick="rebuildIndex()">↻ Rebuild index</button>
             </div>
             <div class="status" id="status">Ready to search</div>
+            <div class="index-progress" id="indexProgress">
+                <div class="progress-label" id="progressLabel">Indexing…</div>
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
             <div class="error" id="error"></div>
         </div>
 
@@ -841,25 +878,67 @@
             return div.innerHTML;
         }
 
+        let indexPollTimer = null;
+
         async function rebuildIndex() {
             const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = '↻ Rebuilding…';
-            statusDiv.innerHTML = '<div class="loading"><span>●</span><span>●</span><span>●</span></div>';
             errorDiv.classList.remove('active');
 
             try {
                 const response = await fetch('/rebuild-index', { method: 'POST' });
                 const data = await response.json();
-                statusDiv.textContent = `✓ Index rebuilt: ${data.items_indexed} chunks indexed`;
+                if (data.status === 'already_running') {
+                    startIndexPolling();
+                    return;
+                }
+                startIndexPolling();
             } catch (error) {
                 errorDiv.textContent = `Rebuild error: ${error.message}`;
                 errorDiv.classList.add('active');
-                statusDiv.textContent = 'Rebuild failed';
-            } finally {
-                btn.textContent = '↻ Rebuild index';
-                btn.disabled = false;
-                checkStatus();
+            }
+        }
+
+        function startIndexPolling() {
+            if (indexPollTimer) return;
+            document.getElementById('indexProgress').classList.add('active');
+            indexPollTimer = setInterval(pollIndexProgress, 1500);
+            pollIndexProgress();
+        }
+
+        async function pollIndexProgress() {
+            try {
+                const response = await fetch('/index-progress');
+                const data = await response.json();
+
+                const progressDiv = document.getElementById('indexProgress');
+                const label = document.getElementById('progressLabel');
+                const fill = document.getElementById('progressBarFill');
+
+                if (data.error) {
+                    clearInterval(indexPollTimer);
+                    indexPollTimer = null;
+                    progressDiv.classList.remove('active');
+                    errorDiv.textContent = `Indexing error: ${data.error}`;
+                    errorDiv.classList.add('active');
+                    return;
+                }
+
+                if (data.running) {
+                    const pct = data.items_total > 0
+                        ? Math.round((data.items_done / data.items_total) * 100)
+                        : 0;
+                    label.textContent = data.items_total > 0
+                        ? `Indexing… ${data.items_done} / ${data.items_total} items (${pct}%)`
+                        : 'Indexing… connecting to Plex';
+                    fill.style.width = `${pct}%`;
+                } else {
+                    clearInterval(indexPollTimer);
+                    indexPollTimer = null;
+                    progressDiv.classList.remove('active');
+                    checkStatus();
+                }
+            } catch {
+                // network error during rebuild — keep polling
             }
         }
 
@@ -887,6 +966,11 @@
 
         checkStatus();
         loadVersion();
+
+        // If a rebuild was already running when the page loaded, pick it up
+        fetch('/index-progress').then(r => r.json()).then(data => {
+            if (data.running) startIndexPolling();
+        }).catch(() => {});
     </script>
 </body>
 </html>
