@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.19"
+VERSION = "1.5.20"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -262,14 +262,26 @@ def extract_year_rating_filters(query):
     elif re.search(r'\b(recent|recently|latest|newest|new releases?)\b', query_lower):
         min_year = current_year - 2
 
-    # "since YEAR" or "from YEAR"
+    # "before YEAR" / "prior to YEAR" — exclusive upper bound
+    if max_year is None:
+        m = re.search(r'\b(?:before|prior\s+to)\s+(19\d{2}|20\d{2})\b', query_lower)
+        if m:
+            max_year = int(m.group(1)) - 1
+
+    # "up to YEAR" / "until YEAR" — inclusive upper bound
+    if max_year is None:
+        m = re.search(r'\b(?:up\s+to|until|till)\s+(19\d{2}|20\d{2})\b', query_lower)
+        if m:
+            max_year = int(m.group(1))
+
+    # "since YEAR" / "from YEAR" / "after YEAR" — lower bound
     if min_year is None:
-        m = re.search(r'\b(?:since|from)\s+(19\d{2}|20\d{2})\b', query_lower)
+        m = re.search(r'\b(?:since|from|after)\s+(19\d{2}|20\d{2})\b', query_lower)
         if m:
             min_year = int(m.group(1))
 
     # "in YEAR" — exact year
-    if min_year is None:
+    if min_year is None and max_year is None:
         m = re.search(r'\bin\s+(19\d{2}|20\d{2})\b', query_lower)
         if m:
             min_year = int(m.group(1))
