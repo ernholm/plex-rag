@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.22"
+VERSION = "1.5.23"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -315,7 +315,7 @@ def extract_resolution_filter(query):
     query_lower = query.lower()
     if re.search(r'\b(4k|uhd|ultra\s*hd|2160p)\b', query_lower):
         return '4K'
-    if re.search(r'\b(1080p|full\s*hd|fhd)\b', query_lower):
+    if re.search(r'\b(1080p|full\s*hd|fhd|hd)\b', query_lower):
         return '1080p'
     if re.search(r'\b720p\b', query_lower):
         return '720p'
@@ -402,7 +402,7 @@ async def search(query_data: SearchQuery):
         for word, _ in NATIONALITY_TO_COUNTRY.items():
             semantic_query = semantic_query.lower().replace(word, "").strip()
         # Strip resolution words so embedding focuses on content concepts
-        for res_word in ['4k', 'uhd', 'ultra hd', '2160p', '1080p', 'full hd', 'fhd', '720p', ' sd ']:
+        for res_word in ['4k', 'uhd', 'ultra hd', '2160p', '1080p', 'full hd', 'fhd', '720p', ' sd ', ' hd ']:
             semantic_query = re.sub(r'\b' + re.escape(res_word) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
         semantic_query = semantic_query.strip() or query_data.query
 

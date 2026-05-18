@@ -7,7 +7,7 @@ A semantic search service for your Plex library. Ask natural questions about you
 - **Semantic Search**: "movies about grief and loss" finds relevant films even if those words aren't in the title
 - **Actor & Genre Filtering**: "Bruce Willis sci-fi" boosts films with Bruce Willis in sci-fi genre; enable Strict Filter to require exact matches
 - **Country/Nationality Filtering**: "Korean thrillers" or "Japanese horror" boosts and filters by country of origin — works for 35+ nationalities
-- **Year, Rating & Resolution Filters**: "feel-good movies in 4K" or "rating of 8 or higher before 2000" apply hard filters — only matching results are returned. Supported resolutions: `4K`, `1080p`, `720p`, `SD`
+- **Year, Rating & Resolution Filters**: "feel-good movies in 4K" or "rating of 8 or higher before 2000" apply hard filters — only matching results are returned. Supported resolutions: `4K` (or `UHD`), `1080p` (or `HD`, `Full HD`), `720p`, `SD`
 - **Rating Sort**: "highest rated", "top rated", or "best rated" queries sort results by rating descending; generic queries like "highest rated tv shows" return all items of that type sorted by rating
 - **Type Filtering**: Queries mentioning "movies"/"films" return only movies; "shows"/"series" returns only TV shows; ambiguous queries return both
 - **Smart Query Parsing**: Actor names and nationality words are stripped before embedding so the semantic search focuses on the concept, not the name
