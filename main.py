@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.13"
+VERSION = "1.5.14"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -229,7 +229,7 @@ def extract_metadata_filters(query, all_actors, all_genres):
     print(f"DEBUG: extract_metadata_filters - Query '{query}' -> Actors: {matched_actors}, Genres: {matched_genres}, Countries: {matched_countries}")
     print(f"DEBUG: Query words (original): {query_words}")
     print(f"DEBUG: Query words (after phrase removal): {query_words_for_genres}")
-    print(f"DEBUG: Available genres in database: {sorted(list(all_genres))[:30]}")
+    print(f"DEBUG: Available genres in database: {sorted(list(all_genres))}")
 
     return matched_actors, matched_genres, matched_countries
 

@@ -156,7 +156,7 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
         genres = []
         try:
             if hasattr(item, 'genres') and item.genres:
-                for genre in item.genres[:3]:
+                for genre in item.genres[:6]:
                     normalized = genre_normalizations.get(genre.tag.lower(), genre.tag)
                     if normalized not in genres:
                         genres.append(normalized)
