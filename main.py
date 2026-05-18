@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.23"
+VERSION = "1.5.24"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -334,17 +334,26 @@ def extract_type_filter(query):
         return 'tv_show'
     return None
 
-def is_rating_sort_query(query):
-    """Return True when the user is asking for results ranked by rating."""
+def get_rating_sort(query):
+    """Return 'desc' for highest-rated queries, 'asc' for lowest-rated, None otherwise."""
     query_lower = query.lower()
-    return any(re.search(p, query_lower) for p in [
+    if any(re.search(p, query_lower) for p in [
         r'\bhighest\s+rated\b',
         r'\btop\s+rated\b',
         r'\bbest\s+rated\b',
         r'\bhighest\s+rating\b',
         r'\bbest\s+rating\b',
         r'\bmost\s+popular\b',
-    ])
+    ]):
+        return 'desc'
+    if any(re.search(p, query_lower) for p in [
+        r'\blowest\s+rated\b',
+        r'\bworst\s+rated\b',
+        r'\blowest\s+rating\b',
+        r'\bworst\s+rating\b',
+    ]):
+        return 'asc'
+    return None
 
 init_db()
 
@@ -502,9 +511,10 @@ async def search(query_data: SearchQuery):
                     seen_keys[key] = result
 
         # Sort by rating when explicitly requested, otherwise by similarity
-        sort_by_rating = is_rating_sort_query(query_data.query)
+        rating_sort = get_rating_sort(query_data.query)
+        sort_by_rating = rating_sort is not None
         if sort_by_rating:
-            deduped_results.sort(key=lambda x: x['rating'] or 0, reverse=True)
+            deduped_results.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
         else:
             deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
 
@@ -583,7 +593,7 @@ async def search(query_data: SearchQuery):
         effective_min_relevance = query_data.min_relevance
         if sort_by_rating:
             q = query_data.query.lower()
-            q = re.sub(r'\b(highest|top|best|most)\s+(rated|rating|popular)\b', '', q)
+            q = re.sub(r'\b(highest|lowest|top|best|worst|most)\s+(rated|rating|popular)\b', '', q)
             q = re.sub(r'\b(movie|movies|film|films|cinema|show|shows|series|tv|television)\b', '', q)
             for actor in matched_actors:
                 q = q.replace(actor.lower(), '')
