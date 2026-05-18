@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.27"
+VERSION = "1.5.28"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -546,15 +546,10 @@ async def search(query_data: SearchQuery):
                     deduped_results[idx] = result
                     seen_keys[key] = result
 
-        # Sort: year sort > rating sort > similarity
+        # Always sort by similarity first so hard filters and threshold see the best candidates
         rating_sort = get_rating_sort(query_data.query)
         sort_by_rating = rating_sort is not None
-        if year_sort:
-            deduped_results.sort(key=lambda x: x['year'] or 0, reverse=(year_sort == 'desc'))
-        elif sort_by_rating:
-            deduped_results.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
-        else:
-            deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
+        deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
 
         # Apply strict filtering if enabled
         if query_data.strict_filter and (matched_actors or matched_genres or matched_countries):
@@ -660,8 +655,15 @@ async def search(query_data: SearchQuery):
             if not re.search(r'[a-z]', q):
                 effective_min_relevance = 0.0
 
-        # Filter by minimum relevance threshold and limit results
+        # Filter by minimum relevance threshold
         filtered_results = [r for r in deduped_results if r['similarity'] >= effective_min_relevance]
+
+        # Apply year/rating sort last — only reorders the semantically relevant results
+        if year_sort:
+            filtered_results.sort(key=lambda x: x['year'] or 0, reverse=(year_sort == 'desc'))
+        elif sort_by_rating:
+            filtered_results.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
+
         top_results = filtered_results[:query_data.limit]
 
         return [
