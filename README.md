@@ -7,6 +7,7 @@ A semantic search service for your Plex library. Ask natural questions about you
 - **Semantic Search**: "movies about grief and loss" finds relevant films even if those words aren't in the title
 - **Actor & Genre Filtering**: "Bruce Willis sci-fi" boosts films with Bruce Willis in sci-fi genre; enable Strict Filter to require exact matches
 - **Country/Nationality Filtering**: "Korean thrillers" or "Japanese horror" boosts and filters by country of origin — works for 35+ nationalities
+- **Year & Rating Filters**: "movies from the last couple of years with a rating of 8 or higher" applies hard filters — only matching results are returned
 - **Smart Query Parsing**: Actor names and nationality words are stripped before embedding so the semantic search focuses on the concept, not the name
 - **Rich Metadata**: Year, duration, director, genres, resolution (4K/1080p/720p/SD), audience rating, and cast (up to 10 actors)
 - **Infinite Scroll**: Starts with 12 results, loads more as you scroll — fetches up to 50 total per query
@@ -138,7 +139,7 @@ PLEX_SECTIONS=Movies,TV Shows
 
 ### Searching
 
-1. Parse query for actor names, genre names, and nationality words
+1. Parse query for actor names, genre names, nationality words, year constraints, and rating constraints
 2. Strip actor names and nationality words from the query before embedding — semantic search focuses on the concept
 3. Embed the cleaned query
 4. Score all chunks by cosine similarity
@@ -149,7 +150,8 @@ PLEX_SECTIONS=Movies,TV Shows
    - Country match: +20%
 6. Deduplicate by Plex key (keep highest-scoring chunk per item)
 7. Apply Strict Filter if enabled (require all matched actors/genres/countries)
-8. Return top results sorted by score
+8. Apply year/rating hard filters when explicitly stated (e.g. "last couple of years", "rating of 8 or higher")
+9. Return top results sorted by score
 
 ### Supported Nationalities
 

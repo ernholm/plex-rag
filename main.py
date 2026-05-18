@@ -6,7 +6,9 @@ from sentence_transformers import SentenceTransformer
 import sqlite3
 import json
 import os
+import re
 import logging
+from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -17,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.14"
+VERSION = "1.5.15"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -233,6 +235,64 @@ def extract_metadata_filters(query, all_actors, all_genres):
 
     return matched_actors, matched_genres, matched_countries
 
+def extract_year_rating_filters(query):
+    """Extract year range and minimum rating constraints from query text."""
+    query_lower = query.lower()
+    current_year = datetime.now().year
+    min_year = None
+    max_year = None
+    min_rating = None
+
+    # Relative year phrases (order matters: more specific first)
+    if re.search(r'\b(last|past)\s+couple\s+of\s+years?\b', query_lower):
+        min_year = current_year - 2
+    elif re.search(r'\b(last|past)\s+few\s+years?\b', query_lower):
+        min_year = current_year - 3
+    elif re.search(r'\b(last|past)\s+year\b', query_lower):
+        min_year = current_year - 1
+    elif re.search(r'\bthis\s+year\b', query_lower):
+        min_year = current_year
+    elif re.search(r'\b(last|past)\s+decade\b', query_lower):
+        min_year = current_year - 10
+    elif re.search(r'\b(recent|recently|latest|newest|new releases?)\b', query_lower):
+        min_year = current_year - 2
+
+    # "since YEAR" or "from YEAR"
+    if min_year is None:
+        m = re.search(r'\b(?:since|from)\s+(19\d{2}|20\d{2})\b', query_lower)
+        if m:
+            min_year = int(m.group(1))
+
+    # "in YEAR" — exact year
+    if min_year is None:
+        m = re.search(r'\bin\s+(19\d{2}|20\d{2})\b', query_lower)
+        if m:
+            min_year = int(m.group(1))
+            max_year = min_year
+
+    # Rating constraints — common phrasings
+    for pattern in [
+        r'rating\s+of\s+(\d+(?:\.\d+)?)\s+or\s+(?:higher|above|more)',
+        r'rated\s+(\d+(?:\.\d+)?)\s+or\s+(?:higher|above|more)',
+        r'(\d+(?:\.\d+)?)\s+or\s+(?:higher|above)',
+        r'above\s+(\d+(?:\.\d+)?)',
+        r'over\s+(\d+(?:\.\d+)?)\s+(?:rating|stars?)',
+        r'at\s+least\s+(?:a\s+)?(\d+(?:\.\d+)?)',
+        r'minimum\s+(?:rating\s+(?:of\s+)?)?(\d+(?:\.\d+)?)',
+    ]:
+        m = re.search(pattern, query_lower)
+        if m:
+            try:
+                rating = float(m.group(1))
+                if 1 <= rating <= 10:
+                    min_rating = rating
+                    break
+            except Exception:
+                pass
+
+    print(f"DEBUG: year/rating filters — min_year={min_year}, max_year={max_year}, min_rating={min_rating}")
+    return min_year, max_year, min_rating
+
 init_db()
 
 # Models
@@ -277,6 +337,7 @@ async def search(query_data: SearchQuery):
         # Extract metadata filters from query
         all_actors, all_genres = get_all_metadata(conn)
         matched_actors, matched_genres, matched_countries = extract_metadata_filters(query_data.query, all_actors, all_genres)
+        min_year, max_year, min_rating = extract_year_rating_filters(query_data.query)
 
         # Strip matched actor names and nationality words from query before
         # embedding so semantic search focuses on concepts
@@ -433,6 +494,17 @@ async def search(query_data: SearchQuery):
 
             print(f"DEBUG: Strict filter results: {len(strict_filtered)} items")
             deduped_results = strict_filtered
+
+        # Apply year/rating hard filters when explicitly stated in query
+        if min_year is not None or max_year is not None or min_rating is not None:
+            before = len(deduped_results)
+            deduped_results = [
+                r for r in deduped_results
+                if (min_year is None or (r['year'] is not None and r['year'] >= min_year))
+                and (max_year is None or (r['year'] is not None and r['year'] <= max_year))
+                and (min_rating is None or (r['rating'] is not None and r['rating'] >= min_rating))
+            ]
+            print(f"DEBUG: Year/rating filter: {len(deduped_results)} results (was {before})")
 
         # Filter by minimum relevance threshold and limit results
         filtered_results = [r for r in deduped_results if r['similarity'] >= query_data.min_relevance]
