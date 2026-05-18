@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.21"
+VERSION = "1.5.22"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -310,6 +310,19 @@ def extract_year_rating_filters(query):
     print(f"DEBUG: year/rating filters — min_year={min_year}, max_year={max_year}, min_rating={min_rating}")
     return min_year, max_year, min_rating
 
+def extract_resolution_filter(query):
+    """Extract resolution filter from query. Returns '4K', '1080p', '720p', 'SD', or None."""
+    query_lower = query.lower()
+    if re.search(r'\b(4k|uhd|ultra\s*hd|2160p)\b', query_lower):
+        return '4K'
+    if re.search(r'\b(1080p|full\s*hd|fhd)\b', query_lower):
+        return '1080p'
+    if re.search(r'\b720p\b', query_lower):
+        return '720p'
+    if re.search(r'\b(sd|standard\s*def(inition)?)\b', query_lower):
+        return 'SD'
+    return None
+
 def extract_type_filter(query):
     """Return 'movie', 'tv_show', or None (no filter) based on explicit type words in query."""
     query_lower = query.lower()
@@ -379,6 +392,7 @@ async def search(query_data: SearchQuery):
         matched_actors, matched_genres, matched_countries = extract_metadata_filters(query_data.query, all_actors, all_genres)
         min_year, max_year, min_rating = extract_year_rating_filters(query_data.query)
         type_filter = extract_type_filter(query_data.query)
+        resolution_filter = extract_resolution_filter(query_data.query)
 
         # Strip matched actor names and nationality words from query before
         # embedding so semantic search focuses on concepts
@@ -387,6 +401,9 @@ async def search(query_data: SearchQuery):
             semantic_query = semantic_query.lower().replace(actor.lower(), "").strip()
         for word, _ in NATIONALITY_TO_COUNTRY.items():
             semantic_query = semantic_query.lower().replace(word, "").strip()
+        # Strip resolution words so embedding focuses on content concepts
+        for res_word in ['4k', 'uhd', 'ultra hd', '2160p', '1080p', 'full hd', 'fhd', '720p', ' sd ']:
+            semantic_query = re.sub(r'\b' + re.escape(res_word) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
         semantic_query = semantic_query.strip() or query_data.query
 
         query_embedding = embedder.encode(semantic_query)
@@ -549,6 +566,11 @@ async def search(query_data: SearchQuery):
                 and (min_rating is None or (r['rating'] is not None and r['rating'] >= min_rating))
             ]
             print(f"DEBUG: Year/rating filter: {len(deduped_results)} results (was {before})")
+
+        # Apply resolution hard filter when explicitly stated in query
+        if resolution_filter:
+            deduped_results = [r for r in deduped_results if r.get('resolution') == resolution_filter]
+            print(f"DEBUG: Resolution filter '{resolution_filter}': {len(deduped_results)} results")
 
         # Filter by type when explicitly stated in query
         if type_filter:
