@@ -85,6 +85,7 @@ def init_db():
             genres TEXT,
             resolution TEXT,
             countries TEXT,
+            added_at INTEGER,
             embedding BLOB NOT NULL
         )
     ''')
@@ -129,6 +130,15 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
 
         # Get year
         year = getattr(item, 'year', None)
+
+        # Get addedAt as Unix timestamp
+        added_at = None
+        try:
+            added_at_dt = getattr(item, 'addedAt', None)
+            if added_at_dt:
+                added_at = int(added_at_dt.timestamp())
+        except:
+            pass
 
         # Get duration (in minutes)
         duration = getattr(item, 'duration', None)
@@ -202,8 +212,8 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             c.execute('''
-                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, countries, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO embeddings (id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, countries, added_at, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 f"{item_type}_{item.key}_{chunk_idx}",
                 item.title,
@@ -219,6 +229,7 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
                 json.dumps(genres),
                 resolution,
                 json.dumps(countries),
+                added_at,
                 json.dumps(embedding)
             ))
             conn.commit()

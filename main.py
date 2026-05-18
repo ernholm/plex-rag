@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.31"
+VERSION = "1.5.32"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -68,6 +68,10 @@ def init_db():
             embedding BLOB NOT NULL
         )
     ''')
+    # Migrate: add added_at column if missing
+    existing = {row[1] for row in c.execute("PRAGMA table_info(embeddings)")}
+    if 'added_at' not in existing:
+        c.execute('ALTER TABLE embeddings ADD COLUMN added_at INTEGER')
     conn.commit()
     conn.close()
 
@@ -347,6 +351,17 @@ def get_year_sort(query):
         return 'asc'
     return None
 
+def get_added_sort(query):
+    """Return 'desc' if query asks for newly/recently added content, None otherwise."""
+    query_lower = query.lower()
+    if any(re.search(p, query_lower) for p in [
+        r'\b(newly|recently|just)\s+added\b',
+        r'\bnew\s+additions?\b',
+        r'\badded\s+recently\b',
+    ]):
+        return 'desc'
+    return None
+
 def extract_type_filter(query):
     """Return 'movie', 'tv_show', or None (no filter) based on explicit type words in query."""
     query_lower = query.lower()
@@ -429,6 +444,7 @@ async def search(query_data: SearchQuery):
         type_filter = extract_type_filter(query_data.query)
         resolution_filter = extract_resolution_filter(query_data.query)
         year_sort = get_year_sort(query_data.query)
+        added_sort = get_added_sort(query_data.query)
         exclusions = extract_exclusions(query_data.query)
 
         # Strip matched actor names and nationality words from query before
@@ -444,6 +460,9 @@ async def search(query_data: SearchQuery):
         # Strip year-sort words
         for word in ['most recent', 'latest', 'newest', 'recent', 'recently', 'first', 'oldest', 'earliest']:
             semantic_query = re.sub(r'\b' + re.escape(word) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
+        # Strip added-sort phrases
+        for phrase in ['newly added', 'recently added', 'just added', 'new additions', 'new addition', 'added recently']:
+            semantic_query = re.sub(r'\b' + re.escape(phrase) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
         # Strip exclusion phrases so embedding focuses on what IS wanted
         semantic_query = re.sub(
             r'\b(?:without|excluding|except(?:\s+for)?|not\s+(?:starring|featuring|including|by))\s+.+',
@@ -454,7 +473,7 @@ async def search(query_data: SearchQuery):
         query_embedding = embedder.encode(semantic_query)
 
         c = conn.cursor()
-        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, countries, embedding FROM embeddings')
+        c.execute('SELECT id, title, type, description, plex_key, poster_url, rating, actors, year, duration, director, genres, resolution, countries, added_at, embedding FROM embeddings')
         rows = c.fetchall()
         conn.close()
 
@@ -465,7 +484,7 @@ async def search(query_data: SearchQuery):
         results = []
         for row in rows:
             try:
-                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, resolution, countries_json, embedding_blob = row
+                doc_id, title, doc_type, description, plex_key, poster_url, rating, actors_json, year, duration, director, genres_json, resolution, countries_json, added_at, embedding_blob = row
 
                 embedding = json.loads(embedding_blob)
                 actors = json.loads(actors_json) if actors_json else []
@@ -524,6 +543,7 @@ async def search(query_data: SearchQuery):
                     'genres': genres,
                     'resolution': resolution,
                     'countries': countries,
+                    'added_at': added_at,
                     'similarity': similarity
                 })
             except Exception as e:
@@ -638,11 +658,14 @@ async def search(query_data: SearchQuery):
         # keywords (type, rating, year, actor, genre, country).
         # e.g. "highest rated tv shows" → return all shows; "highest rated mafia movies" → keep threshold.
         effective_min_relevance = query_data.min_relevance
-        if sort_by_rating or year_sort:
+        if sort_by_rating or year_sort or added_sort:
             q = query_data.query.lower()
             q = re.sub(r'\b(highest|lowest|top|best|worst|most)\s+(rated|rating|popular)\b', '', q)
             q = re.sub(r'\b(best|great|good|worst)\b', '', q)
             q = re.sub(r'\b(most\s+recent|latest|newest|recent|recently|first|oldest|earliest)\b', '', q)
+            q = re.sub(r'\b(newly|recently|just)\s+added\b', '', q)
+            q = re.sub(r'\bnew\s+additions?\b', '', q)
+            q = re.sub(r'\badded\s+recently\b', '', q)
             q = re.sub(r'\b(movie|movies|film|films|cinema|show|shows|series|tv|television)\b', '', q)
             for actor in matched_actors:
                 q = q.replace(actor.lower(), '')
@@ -658,11 +681,11 @@ async def search(query_data: SearchQuery):
         # Filter by minimum relevance threshold (results already sorted by similarity desc)
         filtered_results = [r for r in deduped_results if r['similarity'] >= effective_min_relevance]
 
-        # Apply year/rating sort last — only reorders semantically relevant results.
+        # Apply year/rating/added sort last — only reorders semantically relevant results.
         # When semantic content is present, apply a relative floor (85% of top score)
-        # so that borderline semantic matches don't float to the top when sorted by year/rating.
+        # so that borderline semantic matches don't float to the top when sorted.
         # e.g. for "oldest James Bond movies", top score ~0.61 → floor 0.52 → only Bond films remain.
-        if year_sort or sort_by_rating:
+        if year_sort or sort_by_rating or added_sort:
             if effective_min_relevance > 0 and filtered_results:
                 top_score = filtered_results[0]['similarity']
                 relative_floor = max(effective_min_relevance, top_score * 0.85)
@@ -675,6 +698,8 @@ async def search(query_data: SearchQuery):
                 candidate_pool.sort(key=lambda x: x['year'] or 0, reverse=(year_sort == 'desc'))
             elif sort_by_rating:
                 candidate_pool.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
+            elif added_sort:
+                candidate_pool.sort(key=lambda x: x['added_at'] or 0, reverse=True)
             top_results = candidate_pool[:query_data.limit]
         else:
             top_results = filtered_results[:query_data.limit]
