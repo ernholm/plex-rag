@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.15"
+VERSION = "1.5.16"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -293,6 +293,18 @@ def extract_year_rating_filters(query):
     print(f"DEBUG: year/rating filters — min_year={min_year}, max_year={max_year}, min_rating={min_rating}")
     return min_year, max_year, min_rating
 
+def is_rating_sort_query(query):
+    """Return True when the user is asking for results ranked by rating."""
+    query_lower = query.lower()
+    return any(re.search(p, query_lower) for p in [
+        r'\bhighest\s+rated\b',
+        r'\btop\s+rated\b',
+        r'\bbest\s+rated\b',
+        r'\bhighest\s+rating\b',
+        r'\bbest\s+rating\b',
+        r'\bmost\s+popular\b',
+    ])
+
 init_db()
 
 # Models
@@ -443,8 +455,12 @@ async def search(query_data: SearchQuery):
                     deduped_results[idx] = result
                     seen_keys[key] = result
 
-        # Sort by similarity and take top N
-        deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
+        # Sort by rating when explicitly requested, otherwise by similarity
+        sort_by_rating = is_rating_sort_query(query_data.query)
+        if sort_by_rating:
+            deduped_results.sort(key=lambda x: x['rating'] or 0, reverse=True)
+        else:
+            deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
 
         # Apply strict filtering if enabled
         if query_data.strict_filter and (matched_actors or matched_genres or matched_countries):
