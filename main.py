@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.24"
+VERSION = "1.5.25"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -344,6 +344,7 @@ def get_rating_sort(query):
         r'\bhighest\s+rating\b',
         r'\bbest\s+rating\b',
         r'\bmost\s+popular\b',
+        r'\b(best|great|good)\b',
     ]):
         return 'desc'
     if any(re.search(p, query_lower) for p in [
@@ -351,6 +352,7 @@ def get_rating_sort(query):
         r'\bworst\s+rated\b',
         r'\blowest\s+rating\b',
         r'\bworst\s+rating\b',
+        r'\bworst\b',
     ]):
         return 'asc'
     return None
@@ -594,6 +596,7 @@ async def search(query_data: SearchQuery):
         if sort_by_rating:
             q = query_data.query.lower()
             q = re.sub(r'\b(highest|lowest|top|best|worst|most)\s+(rated|rating|popular)\b', '', q)
+            q = re.sub(r'\b(best|great|good|worst)\b', '', q)
             q = re.sub(r'\b(movie|movies|film|films|cinema|show|shows|series|tv|television)\b', '', q)
             for actor in matched_actors:
                 q = q.replace(actor.lower(), '')
