@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.20"
+VERSION = "1.5.21"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -432,7 +432,7 @@ async def search(query_data: SearchQuery):
                 if matched_actors and actors:
                     matching_actors = [a for a in actors if any(a.lower() == ma.lower() for ma in matched_actors)]
                     if matching_actors:
-                        metadata_boost += min(0.10, 0.08 * len(matching_actors))
+                        metadata_boost += min(0.50, 0.40 * len(matching_actors))
 
                 # Boost if result has matching genre
                 if matched_genres and genres:
@@ -555,8 +555,27 @@ async def search(query_data: SearchQuery):
             deduped_results = [r for r in deduped_results if r['type'] == type_filter]
             print(f"DEBUG: Type filter '{type_filter}': {len(deduped_results)} results")
 
+        # When sorting by rating, drop the similarity threshold if the query has
+        # no semantic concept beyond structural keywords (type, rating, year, actor, genre, country).
+        # e.g. "highest rated tv shows" → return all shows; "highest rated mafia movies" → keep threshold.
+        effective_min_relevance = query_data.min_relevance
+        if sort_by_rating:
+            q = query_data.query.lower()
+            q = re.sub(r'\b(highest|top|best|most)\s+(rated|rating|popular)\b', '', q)
+            q = re.sub(r'\b(movie|movies|film|films|cinema|show|shows|series|tv|television)\b', '', q)
+            for actor in matched_actors:
+                q = q.replace(actor.lower(), '')
+            for genre in matched_genres:
+                q = q.replace(genre.lower(), '')
+            for word in NATIONALITY_TO_COUNTRY:
+                q = re.sub(r'\b' + re.escape(word) + r'\b', '', q)
+            q = re.sub(r'\b(last|past|couple|few|years?|decade|recent|recently|latest|newest|before|after|since|from|until)\b', '', q)
+            q = re.sub(r'\b\d+\b', '', q)
+            if not re.search(r'[a-z]', q):
+                effective_min_relevance = 0.0
+
         # Filter by minimum relevance threshold and limit results
-        filtered_results = [r for r in deduped_results if r['similarity'] >= query_data.min_relevance]
+        filtered_results = [r for r in deduped_results if r['similarity'] >= effective_min_relevance]
         top_results = filtered_results[:query_data.limit]
 
         return [
