@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.12"
+VERSION = "1.5.13"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -190,9 +190,13 @@ def extract_metadata_filters(query, all_actors, all_genres):
         genre_words = genre_lower.split()
 
         if len(genre_words) == 1:
-            # Single-word genre: match as complete word only
-            # Use the cleaned query (without excluded phrases)
-            if genre_lower in query_words_for_genres:
+            # Single-word genre: match exact word or common plural forms
+            # e.g. "thrillers" → "Thriller", "comedies" → "Comedy", "dramas" → "Drama"
+            plural_s = genre_lower + 's'
+            plural_ies = genre_lower[:-1] + 'ies' if genre_lower.endswith('y') else None
+            if (genre_lower in query_words_for_genres
+                    or plural_s in query_words_for_genres
+                    or (plural_ies and plural_ies in query_words_for_genres)):
                 matched_genres.append(genre)
         else:
             # Multi-word genre: check if words appear consecutively in query
