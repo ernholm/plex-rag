@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.29"
+VERSION = "1.5.30"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -659,11 +659,16 @@ async def search(query_data: SearchQuery):
         filtered_results = [r for r in deduped_results if r['similarity'] >= effective_min_relevance]
 
         # Apply year/rating sort last — only reorders semantically relevant results.
-        # When semantic filtering is active (threshold > 0), cap the candidate pool to
-        # the top N most relevant results so borderline matches don't float to the top.
+        # When semantic content is present, apply a relative floor (70% of top score)
+        # so that borderline semantic matches don't float to the top when sorted by year/rating.
+        # e.g. for "oldest James Bond movies", top score ~0.61 → floor 0.43 → only Bond films remain.
         if year_sort or sort_by_rating:
-            if effective_min_relevance > 0:
-                candidate_pool = filtered_results[:max(query_data.limit * 4, 50)]
+            if effective_min_relevance > 0 and filtered_results:
+                top_score = filtered_results[0]['similarity']
+                relative_floor = max(effective_min_relevance, top_score * 0.70)
+                candidate_pool = [r for r in filtered_results if r['similarity'] >= relative_floor]
+                if not candidate_pool:
+                    candidate_pool = filtered_results[:query_data.limit]
             else:
                 candidate_pool = filtered_results
             if year_sort:
