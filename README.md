@@ -10,6 +10,7 @@ A semantic search service for your Plex library. Ask natural questions about you
 - **Year, Rating & Resolution Filters**: "feel-good movies in 4K" or "rating of 8 or higher before 2000" apply hard filters — only matching results are returned. Supported resolutions: `4K` (or `UHD`), `1080p` (or `HD`, `Full HD`), `720p`, `SD`
 - **Rating Sort**: "best/great/good/highest/top rated" sorts by rating descending; "worst/lowest rated" sorts ascending — generic queries like "best tv shows" return all items of that type sorted by rating
 - **Year Sort**: "first/oldest" sorts by year ascending (oldest first); "most recent/latest/newest/recent" sorts by year descending (newest first) — e.g. "the first Bond movies" or "most recent horror films"
+- **Exclusions**: "spy movies without James Bond", "thrillers excluding Tom Cruise", "horror not starring Sigourney Weaver" — excluded term is matched against title, description, and cast
 - **Type Filtering**: Queries mentioning "movies"/"films" return only movies; "shows"/"series" returns only TV shows; ambiguous queries return both
 - **Smart Query Parsing**: Actor names and nationality words are stripped before embedding so the semantic search focuses on the concept, not the name
 - **Rich Metadata**: Year, duration, director, genres, resolution (4K/1080p/720p/SD), audience rating, and cast (up to 10 actors)

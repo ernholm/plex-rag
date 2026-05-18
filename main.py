@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.26"
+VERSION = "1.5.27"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -321,6 +321,16 @@ def extract_resolution_filter(query):
         return 'SD'
     return None
 
+def extract_exclusions(query):
+    """Extract terms to exclude from results (from 'without X', 'excluding X', 'except X')."""
+    m = re.search(r'\b(?:without|excluding|except(?:\s+for)?|not\s+(?:starring|featuring|including|by))\s+(.+)', query.lower())
+    if not m:
+        return []
+    term = m.group(1).strip()
+    # Remove trailing type words
+    term = re.sub(r'\s+(?:movies?|films?|shows?|series)\s*$', '', term).strip()
+    return [term] if term else []
+
 def get_year_sort(query):
     """Return 'desc' for newest-first queries, 'asc' for oldest-first, None otherwise."""
     query_lower = query.lower()
@@ -419,6 +429,7 @@ async def search(query_data: SearchQuery):
         type_filter = extract_type_filter(query_data.query)
         resolution_filter = extract_resolution_filter(query_data.query)
         year_sort = get_year_sort(query_data.query)
+        exclusions = extract_exclusions(query_data.query)
 
         # Strip matched actor names and nationality words from query before
         # embedding so semantic search focuses on concepts
@@ -433,6 +444,11 @@ async def search(query_data: SearchQuery):
         # Strip year-sort words
         for word in ['most recent', 'latest', 'newest', 'recent', 'recently', 'first', 'oldest', 'earliest']:
             semantic_query = re.sub(r'\b' + re.escape(word) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
+        # Strip exclusion phrases so embedding focuses on what IS wanted
+        semantic_query = re.sub(
+            r'\b(?:without|excluding|except(?:\s+for)?|not\s+(?:starring|featuring|including|by))\s+.+',
+            '', semantic_query, flags=re.IGNORECASE
+        ).strip()
         semantic_query = semantic_query.strip() or query_data.query
 
         query_embedding = embedder.encode(semantic_query)
@@ -603,6 +619,20 @@ async def search(query_data: SearchQuery):
         if resolution_filter:
             deduped_results = [r for r in deduped_results if r.get('resolution') == resolution_filter]
             print(f"DEBUG: Resolution filter '{resolution_filter}': {len(deduped_results)} results")
+
+        # Apply exclusions — filter out results where excluded term appears in title, description, or cast
+        if exclusions:
+            before = len(deduped_results)
+            def _is_excluded(result, exclusions):
+                haystack = ' '.join([
+                    result['title'] or '',
+                    result['description'] or '',
+                    result['director'] or '',
+                    ' '.join(result['actors']),
+                ]).lower()
+                return any(term in haystack for term in exclusions)
+            deduped_results = [r for r in deduped_results if not _is_excluded(r, exclusions)]
+            print(f"DEBUG: Exclusions {exclusions}: {len(deduped_results)} results (was {before})")
 
         # Filter by type when explicitly stated in query
         if type_filter:
