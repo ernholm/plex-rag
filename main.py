@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.16"
+VERSION = "1.5.17"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -145,6 +145,11 @@ NATIONALITY_TO_COUNTRY = {
     'swiss': 'Switzerland',
     'israeli': 'Israel',
 }
+
+def _country_match(stored: str, search: str) -> bool:
+    """Flexible country match: 'Korea' matches 'South Korea' and vice versa."""
+    a, b = stored.lower(), search.lower()
+    return a == b or a in b or b in a
 
 def extract_metadata_filters(query, all_actors, all_genres):
     """Extract actor names, genres and countries from query"""
@@ -413,7 +418,7 @@ async def search(query_data: SearchQuery):
 
                 # Boost if result has matching country
                 if matched_countries and countries:
-                    if any(c.lower() == mc.lower() for c in countries for mc in matched_countries):
+                    if any(_country_match(c, mc) for c in countries for mc in matched_countries):
                         metadata_boost += 0.20
 
                 similarity = min(0.99, similarity + metadata_boost)
@@ -488,11 +493,10 @@ async def search(query_data: SearchQuery):
                     )
 
                 if matched_countries and result['countries']:
-                    result_countries_lower = [c.lower() for c in result['countries']]
                     has_matching_country = any(
-                        mc.lower() == c
+                        _country_match(c, mc)
                         for mc in matched_countries
-                        for c in result_countries_lower
+                        for c in result['countries']
                     )
 
                 # Build list of which filters were specified and which matched
@@ -599,6 +603,35 @@ async def debug_actors():
         return [
             {"title": row[0], "actors": json.loads(row[1])}
             for row in rows
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
+
+@app.get("/debug/movie")
+async def debug_movie(title: str):
+    """Show stored metadata for a specific title (case-insensitive substring match)."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(
+            'SELECT DISTINCT title, year, rating, genres, countries, actors, director, resolution '
+            'FROM embeddings WHERE LOWER(title) LIKE ? LIMIT 5',
+            (f"%{title.lower()}%",)
+        )
+        rows = c.fetchall()
+        conn.close()
+        return [
+            {
+                "title": r[0],
+                "year": r[1],
+                "rating": r[2],
+                "genres": json.loads(r[3]) if r[3] else [],
+                "countries": json.loads(r[4]) if r[4] else [],
+                "actors": json.loads(r[5]) if r[5] else [],
+                "director": r[6],
+                "resolution": r[7],
+            }
+            for r in rows
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Debug error: {str(e)}")
