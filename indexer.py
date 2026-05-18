@@ -163,11 +163,15 @@ def index_item(item, item_type, plex_url, plex_token, embedder):
         except:
             pass
 
-        # Get countries of origin
+        # Get countries of origin, normalizing variant names
         countries = []
         try:
             if hasattr(item, 'countries') and item.countries:
-                countries = [country.tag for country in item.countries]
+                for country in item.countries:
+                    tag = country.tag
+                    if 'korea' in tag.lower():
+                        tag = 'Korea'
+                    countries.append(tag)
         except:
             pass
 

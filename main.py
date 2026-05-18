@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.17"
+VERSION = "1.5.18"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -109,7 +109,7 @@ def get_all_metadata(conn):
 
 # Maps demonyms and country adjectives to Plex country names
 NATIONALITY_TO_COUNTRY = {
-    'korean': 'South Korea',
+    'korean': 'Korea',
     'japanese': 'Japan',
     'chinese': 'China',
     'french': 'France',
