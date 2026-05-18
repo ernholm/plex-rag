@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.25"
+VERSION = "1.5.26"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -259,8 +259,6 @@ def extract_year_rating_filters(query):
         min_year = current_year
     elif re.search(r'\b(last|past)\s+decade\b', query_lower):
         min_year = current_year - 10
-    elif re.search(r'\b(recent|recently|latest|newest|new releases?)\b', query_lower):
-        min_year = current_year - 2
 
     # "before YEAR" / "prior to YEAR" — exclusive upper bound
     if max_year is None:
@@ -321,6 +319,22 @@ def extract_resolution_filter(query):
         return '720p'
     if re.search(r'\b(sd|standard\s*def(inition)?)\b', query_lower):
         return 'SD'
+    return None
+
+def get_year_sort(query):
+    """Return 'desc' for newest-first queries, 'asc' for oldest-first, None otherwise."""
+    query_lower = query.lower()
+    if any(re.search(p, query_lower) for p in [
+        r'\bmost\s+recent\b',
+        r'\b(latest|newest|recent|recently)\b',
+    ]):
+        return 'desc'
+    if any(re.search(p, query_lower) for p in [
+        r'\bfirst\b',
+        r'\boldest\b',
+        r'\bearliest\b',
+    ]):
+        return 'asc'
     return None
 
 def extract_type_filter(query):
@@ -404,6 +418,7 @@ async def search(query_data: SearchQuery):
         min_year, max_year, min_rating = extract_year_rating_filters(query_data.query)
         type_filter = extract_type_filter(query_data.query)
         resolution_filter = extract_resolution_filter(query_data.query)
+        year_sort = get_year_sort(query_data.query)
 
         # Strip matched actor names and nationality words from query before
         # embedding so semantic search focuses on concepts
@@ -415,6 +430,9 @@ async def search(query_data: SearchQuery):
         # Strip resolution words so embedding focuses on content concepts
         for res_word in ['4k', 'uhd', 'ultra hd', '2160p', '1080p', 'full hd', 'fhd', '720p', ' sd ', ' hd ']:
             semantic_query = re.sub(r'\b' + re.escape(res_word) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
+        # Strip year-sort words
+        for word in ['most recent', 'latest', 'newest', 'recent', 'recently', 'first', 'oldest', 'earliest']:
+            semantic_query = re.sub(r'\b' + re.escape(word) + r'\b', '', semantic_query, flags=re.IGNORECASE).strip()
         semantic_query = semantic_query.strip() or query_data.query
 
         query_embedding = embedder.encode(semantic_query)
@@ -512,10 +530,12 @@ async def search(query_data: SearchQuery):
                     deduped_results[idx] = result
                     seen_keys[key] = result
 
-        # Sort by rating when explicitly requested, otherwise by similarity
+        # Sort: year sort > rating sort > similarity
         rating_sort = get_rating_sort(query_data.query)
         sort_by_rating = rating_sort is not None
-        if sort_by_rating:
+        if year_sort:
+            deduped_results.sort(key=lambda x: x['year'] or 0, reverse=(year_sort == 'desc'))
+        elif sort_by_rating:
             deduped_results.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
         else:
             deduped_results.sort(key=lambda x: x['similarity'], reverse=True)
@@ -593,10 +613,11 @@ async def search(query_data: SearchQuery):
         # no semantic concept beyond structural keywords (type, rating, year, actor, genre, country).
         # e.g. "highest rated tv shows" → return all shows; "highest rated mafia movies" → keep threshold.
         effective_min_relevance = query_data.min_relevance
-        if sort_by_rating:
+        if sort_by_rating or year_sort:
             q = query_data.query.lower()
             q = re.sub(r'\b(highest|lowest|top|best|worst|most)\s+(rated|rating|popular)\b', '', q)
             q = re.sub(r'\b(best|great|good|worst)\b', '', q)
+            q = re.sub(r'\b(most\s+recent|latest|newest|recent|recently|first|oldest|earliest)\b', '', q)
             q = re.sub(r'\b(movie|movies|film|films|cinema|show|shows|series|tv|television)\b', '', q)
             for actor in matched_actors:
                 q = q.replace(actor.lower(), '')
