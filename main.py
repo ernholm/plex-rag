@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.18"
+VERSION = "1.5.19"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -298,6 +298,17 @@ def extract_year_rating_filters(query):
     print(f"DEBUG: year/rating filters — min_year={min_year}, max_year={max_year}, min_rating={min_rating}")
     return min_year, max_year, min_rating
 
+def extract_type_filter(query):
+    """Return 'movie', 'tv_show', or None (no filter) based on explicit type words in query."""
+    query_lower = query.lower()
+    wants_movie = bool(re.search(r'\b(movie|movies|film|films|cinema)\b', query_lower))
+    wants_show = bool(re.search(r'\b(show|shows|series|tv\s*show|tv\s*series|television)\b', query_lower))
+    if wants_movie and not wants_show:
+        return 'movie'
+    if wants_show and not wants_movie:
+        return 'tv_show'
+    return None
+
 def is_rating_sort_query(query):
     """Return True when the user is asking for results ranked by rating."""
     query_lower = query.lower()
@@ -355,6 +366,7 @@ async def search(query_data: SearchQuery):
         all_actors, all_genres = get_all_metadata(conn)
         matched_actors, matched_genres, matched_countries = extract_metadata_filters(query_data.query, all_actors, all_genres)
         min_year, max_year, min_rating = extract_year_rating_filters(query_data.query)
+        type_filter = extract_type_filter(query_data.query)
 
         # Strip matched actor names and nationality words from query before
         # embedding so semantic search focuses on concepts
@@ -525,6 +537,11 @@ async def search(query_data: SearchQuery):
                 and (min_rating is None or (r['rating'] is not None and r['rating'] >= min_rating))
             ]
             print(f"DEBUG: Year/rating filter: {len(deduped_results)} results (was {before})")
+
+        # Filter by type when explicitly stated in query
+        if type_filter:
+            deduped_results = [r for r in deduped_results if r['type'] == type_filter]
+            print(f"DEBUG: Type filter '{type_filter}': {len(deduped_results)} results")
 
         # Filter by minimum relevance threshold and limit results
         filtered_results = [r for r in deduped_results if r['similarity'] >= query_data.min_relevance]
