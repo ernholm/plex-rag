@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.28"
+VERSION = "1.5.29"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -655,16 +655,24 @@ async def search(query_data: SearchQuery):
             if not re.search(r'[a-z]', q):
                 effective_min_relevance = 0.0
 
-        # Filter by minimum relevance threshold
+        # Filter by minimum relevance threshold (results already sorted by similarity desc)
         filtered_results = [r for r in deduped_results if r['similarity'] >= effective_min_relevance]
 
-        # Apply year/rating sort last — only reorders the semantically relevant results
-        if year_sort:
-            filtered_results.sort(key=lambda x: x['year'] or 0, reverse=(year_sort == 'desc'))
-        elif sort_by_rating:
-            filtered_results.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
-
-        top_results = filtered_results[:query_data.limit]
+        # Apply year/rating sort last — only reorders semantically relevant results.
+        # When semantic filtering is active (threshold > 0), cap the candidate pool to
+        # the top N most relevant results so borderline matches don't float to the top.
+        if year_sort or sort_by_rating:
+            if effective_min_relevance > 0:
+                candidate_pool = filtered_results[:max(query_data.limit * 4, 50)]
+            else:
+                candidate_pool = filtered_results
+            if year_sort:
+                candidate_pool.sort(key=lambda x: x['year'] or 0, reverse=(year_sort == 'desc'))
+            elif sort_by_rating:
+                candidate_pool.sort(key=lambda x: x['rating'] or 0, reverse=(rating_sort == 'desc'))
+            top_results = candidate_pool[:query_data.limit]
+        else:
+            top_results = filtered_results[:query_data.limit]
 
         return [
             SearchResult(
