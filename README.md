@@ -8,7 +8,7 @@ A semantic search service for your Plex library. Ask natural questions about you
 - **Actor & Genre Filtering**: "Bruce Willis sci-fi" boosts films with Bruce Willis in sci-fi genre; enable Strict Filter to require exact matches
 - **Country/Nationality Filtering**: "Korean thrillers" or "Japanese horror" boosts and filters by country of origin — works for 35+ nationalities
 - **Year & Rating Filters**: "movies from the last couple of years with a rating of 8 or higher" applies hard filters — only matching results are returned
-- **Rating Sort**: "highest rated", "top rated", or "best rated" queries sort results by rating descending instead of semantic score
+- **Rating Sort**: "highest rated", "top rated", or "best rated" queries sort results by rating descending; generic queries like "highest rated tv shows" return all items of that type sorted by rating
 - **Type Filtering**: Queries mentioning "movies"/"films" return only movies; "shows"/"series" returns only TV shows; ambiguous queries return both
 - **Smart Query Parsing**: Actor names and nationality words are stripped before embedding so the semantic search focuses on the concept, not the name
 - **Rich Metadata**: Year, duration, director, genres, resolution (4K/1080p/720p/SD), audience rating, and cast (up to 10 actors)
@@ -147,7 +147,7 @@ PLEX_SECTIONS=Movies,TV Shows
 4. Score all chunks by cosine similarity
 5. Apply metadata boosts:
    - Title match: up to +30%
-   - Actor match: +8% per actor (max +10%)
+   - Actor match: +40% per actor (max +50%)
    - Genre match: +10% per genre (max +20%)
    - Country match: +20%
 6. Deduplicate by Plex key (keep highest-scoring chunk per item)
