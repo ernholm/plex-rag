@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Version tracking
-VERSION = "1.5.30"
+VERSION = "1.5.31"
 
 # Indexing state — updated by background thread, read by /index-progress
 indexing_state = {
@@ -634,8 +634,8 @@ async def search(query_data: SearchQuery):
             deduped_results = [r for r in deduped_results if r['type'] == type_filter]
             print(f"DEBUG: Type filter '{type_filter}': {len(deduped_results)} results")
 
-        # When sorting by rating, drop the similarity threshold if the query has
-        # no semantic concept beyond structural keywords (type, rating, year, actor, genre, country).
+        # Drop the similarity threshold when the query has no semantic concept beyond structural
+        # keywords (type, rating, year, actor, genre, country).
         # e.g. "highest rated tv shows" → return all shows; "highest rated mafia movies" → keep threshold.
         effective_min_relevance = query_data.min_relevance
         if sort_by_rating or year_sort:
@@ -659,13 +659,13 @@ async def search(query_data: SearchQuery):
         filtered_results = [r for r in deduped_results if r['similarity'] >= effective_min_relevance]
 
         # Apply year/rating sort last — only reorders semantically relevant results.
-        # When semantic content is present, apply a relative floor (70% of top score)
+        # When semantic content is present, apply a relative floor (85% of top score)
         # so that borderline semantic matches don't float to the top when sorted by year/rating.
-        # e.g. for "oldest James Bond movies", top score ~0.61 → floor 0.43 → only Bond films remain.
+        # e.g. for "oldest James Bond movies", top score ~0.61 → floor 0.52 → only Bond films remain.
         if year_sort or sort_by_rating:
             if effective_min_relevance > 0 and filtered_results:
                 top_score = filtered_results[0]['similarity']
-                relative_floor = max(effective_min_relevance, top_score * 0.70)
+                relative_floor = max(effective_min_relevance, top_score * 0.85)
                 candidate_pool = [r for r in filtered_results if r['similarity'] >= relative_floor]
                 if not candidate_pool:
                     candidate_pool = filtered_results[:query_data.limit]
