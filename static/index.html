@@ -790,7 +790,7 @@
                     ${result.poster_url ? `<img src="${result.poster_url}" alt="${escapeHtml(result.title)}" loading="lazy">` : '🎬'}
                 </div>
                 <div class="result-content">
-                    <div class="result-title">${escapeHtml(result.title)}${result.year ? ` <span class="result-year">(${result.year})</span>` : ''}</div>
+                    <div class="result-title">${escapeHtml(result.title) + (result.year ? ' <span class="result-year">(' + result.year + ')</span>' : '')}</div>
                     <div>
                         <span class="result-type">${typeLabel}</span>
                         ${result.resolution ? `<span class="result-resolution">${escapeHtml(result.resolution)}</span>` : ''}
